@@ -1,0 +1,90 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: riskiq-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: riskiq
+      POSTGRES_PASSWORD: riskiq
+      POSTGRES_DB: riskiq
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/postgres/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/postgres/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+
+  mongo:
+    image: mongo:7
+    container_name: riskiq-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: ai-service-python/Dockerfile
+    container_name: riskiq-ai
+    restart: unless-stopped
+    environment:
+      PORT: 8000
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      DEEPSEEK_BASE_URL: https://api.deepseek.com
+      DEEPSEEK_MODEL: deepseek-reasoner
+      RULES_PATH: /app/rules/rules.json
+      REPORTS_DIR: /app/reports/generated
+    volumes:
+      - ./rules:/app/rules
+      - ./reports:/app/reports
+      - ./uploads:/app/uploads
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongo
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend-node/Dockerfile
+    container_name: riskiq-backend
+    restart: unless-stopped
+    environment:
+      PORT: 4000
+      JWT_SECRET: riskiq_super_secret_change_me
+      JWT_EXPIRES_IN: 1d
+      PYTHON_SERVICE_URL: http://ai-service:8000
+      POSTGRES_URL: postgresql://riskiq:riskiq@postgres:5432/riskiq
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: riskiq
+      UPLOAD_DIR: uploads
+    volumes:
+      - ./uploads:/app/backend-node/uploads
+      - ./reports:/app/reports
+    ports:
+      - "4000:4000"
+    depends_on:
+      - postgres
+      - mongo
+      - ai-service
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: riskiq-frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_BASE_URL: http://localhost:4000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  mongo_data:

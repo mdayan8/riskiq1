@@ -1,0 +1,6 @@
+Borrower Name: Amit Shah
+Loan Amount: INR 25000
+Interest Rate: 7.5% per annum
+Disbursement Date: 2026-01-15
+Repayment Clause: Monthly EMI over 24 months.
+Risk Indicator: delayed KYC verification.

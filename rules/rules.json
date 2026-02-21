@@ -1,0 +1,362 @@
+[
+  {
+    "id": "RBI-KYC-NAME-001",
+    "regulator": "RBI",
+    "description": "Customer legal name must exist",
+    "field": "names",
+    "requirement": "must_exist",
+    "severity": "HIGH"
+  },
+  {
+    "id": "RBI-KYC-ID-002",
+    "regulator": "RBI",
+    "description": "Counterparty identity must be present",
+    "field": "counterparties",
+    "requirement": "must_exist",
+    "severity": "HIGH"
+  },
+  {
+    "id": "RBI-LOAN-AMOUNT-003",
+    "regulator": "RBI",
+    "description": "Loan amount must be disclosed",
+    "field": "amounts",
+    "requirement": "must_exist",
+    "severity": "HIGH"
+  },
+  {
+    "id": "RBI-INT-RATE-004",
+    "regulator": "RBI",
+    "description": "Interest rate disclosure is mandatory",
+    "field": "interest_rates",
+    "requirement": "must_exist",
+    "severity": "HIGH"
+  },
+  {
+    "id": "RBI-DATE-005",
+    "regulator": "RBI",
+    "description": "Effective/transaction date must exist",
+    "field": "dates",
+    "requirement": "must_exist",
+    "severity": "MEDIUM"
+  },
+  {
+    "id": "RBI-CLAUSE-006",
+    "regulator": "RBI",
+    "description": "Material financial clause must be present",
+    "field": "clauses",
+    "requirement": "min_count_1",
+    "severity": "MEDIUM"
+  },
+  {
+    "id": "RBI-OBLIGATION-007",
+    "regulator": "RBI",
+    "description": "Borrower obligation must be captured",
+    "field": "obligations",
+    "requirement": "min_count_1",
+    "severity": "HIGH"
+  },
+  {
+    "id": "RBI-CONSENT-008",
+    "regulator": "RBI",
+    "description": "Customer consent clause must exist",
+    "field": "consent_clauses",
+    "requirement": "min_count_1",
+    "severity": "HIGH"
+  },
+  {
+    "id": "RBI-DATA-009",
+    "regulator": "RBI",
+    "description": "Data protection clause must be present",
+    "field": "data_protection_clauses",
+    "requirement": "min_count_1",
+    "severity": "HIGH"
+  },
+  {
+    "id": "RBI-RISK-010",
+    "regulator": "RBI",
+    "description": "Risk indicators should be identified",
+    "field": "risk_indicators",
+    "requirement": "min_count_1",
+    "severity": "MEDIUM"
+  },
+  {
+    "id": "RBI-LSP-DISC-011",
+    "regulator": "RBI",
+    "description": "Digital lending service terms must be transparent",
+    "field": "clauses",
+    "requirement": "min_count_1",
+    "severity": "MEDIUM"
+  },
+  {
+    "id": "RBI-FEE-DISC-012",
+    "regulator": "RBI",
+    "description": "Cost and fee disclosure must exist",
+    "field": "amounts",
+    "requirement": "must_exist",
+    "severity": "HIGH"
+  },
+  {
+    "id": "RBI-REPAY-013",
+    "regulator": "RBI",
+    "description": "Repayment schedule references must exist",
+    "field": "dates",
+    "requirement": "min_count_1",
+    "severity": "MEDIUM"
+  },
+  {
+    "id": "RBI-GRIEV-014",
+    "regulator": "RBI",
+    "description": "Grievance redressal marker must exist",
+    "field": "clauses",
+    "requirement": "min_count_1",
+    "severity": "LOW"
+  },
+  {
+    "id": "RBI-AUDIT-015",
+    "regulator": "RBI",
+    "description": "Audit/access rights clause should exist",
+    "field": "clauses",
+    "requirement": "min_count_1",
+    "severity": "LOW"
+  },
+  {
+    "id": "RBI-VENDOR-016",
+    "regulator": "RBI",
+    "description": "Outsourcing vendor accountability should exist",
+    "field": "obligations",
+    "requirement": "min_count_1",
+    "severity": "MEDIUM"
+  },
+  {
+    "id": "RBI-FRAUD-017",
+    "regulator": "RBI",
+    "description": "Fraud escalation marker should exist",
+    "field": "risk_indicators",
+    "requirement": "min_count_1",
+    "severity": "MEDIUM"
+  },
+  {
+    "id": "RBI-CDD-018",
+    "regulator": "RBI",
+    "description": "CDD relevant identity references must exist",
+    "field": "names",
+    "requirement": "must_exist",
+    "severity": "HIGH"
+  },
+  {
+    "id": "RBI-AML-019",
+    "regulator": "RBI",
+    "description": "AML monitoring indicators should exist",
+    "field": "risk_indicators",
+    "requirement": "min_count_1",
+    "severity": "HIGH"
+  },
+  {
+    "id": "RBI-BOARD-020",
+    "regulator": "RBI",
+    "description": "Governance oversight clause should exist",
+    "field": "clauses",
+    "requirement": "min_count_1",
+    "severity": "LOW"
+  },
+  {
+    "id": "GRC-BCBS-GOV-001",
+    "regulator": "GRC",
+    "description": "Board governance responsibilities must be referenced",
+    "field": "clauses",
+    "requirement": "min_count_1",
+    "severity": "MEDIUM"
+  },
+  {
+    "id": "GRC-BCBS-RISK-002",
+    "regulator": "GRC",
+    "description": "Risk appetite and controls reference should exist",
+    "field": "risk_indicators",
+    "requirement": "min_count_1",
+    "severity": "MEDIUM"
+  },
+  {
+    "id": "GRC-FATF-CDD-003",
+    "regulator": "GRC",
+    "description": "Beneficial ownership/identity marker should exist",
+    "field": "counterparties",
+    "requirement": "min_count_1",
+    "severity": "HIGH"
+  },
+  {
+    "id": "GRC-FATF-STR-004",
+    "regulator": "GRC",
+    "description": "Suspicious activity marker should exist",
+    "field": "risk_indicators",
+    "requirement": "min_count_1",
+    "severity": "HIGH"
+  },
+  {
+    "id": "GRC-NIST-GOV-005",
+    "regulator": "GRC",
+    "description": "Cyber governance mention should exist",
+    "field": "clauses",
+    "requirement": "min_count_1",
+    "severity": "MEDIUM"
+  },
+  {
+    "id": "GRC-NIST-IR-006",
+    "regulator": "GRC",
+    "description": "Incident response mention should exist",
+    "field": "clauses",
+    "requirement": "min_count_1",
+    "severity": "MEDIUM"
+  },
+  {
+    "id": "GRC-ISO27001-007",
+    "regulator": "GRC",
+    "description": "Security control obligations should exist",
+    "field": "obligations",
+    "requirement": "min_count_1",
+    "severity": "MEDIUM"
+  },
+  {
+    "id": "GRC-ISO22301-008",
+    "regulator": "GRC",
+    "description": "Business continuity clause should exist",
+    "field": "clauses",
+    "requirement": "min_count_1",
+    "severity": "LOW"
+  },
+  {
+    "id": "GRC-COSO-009",
+    "regulator": "GRC",
+    "description": "Internal control responsibilities should exist",
+    "field": "obligations",
+    "requirement": "min_count_1",
+    "severity": "LOW"
+  },
+  {
+    "id": "GRC-OECD-AI-010",
+    "regulator": "GRC",
+    "description": "Explainability/oversight indicator should exist",
+    "field": "risk_indicators",
+    "requirement": "min_count_1",
+    "severity": "MEDIUM"
+  },
+  {
+    "id": "GRC-GDPR-011",
+    "regulator": "GRC",
+    "description": "Lawful processing/data purpose clause should exist",
+    "field": "data_protection_clauses",
+    "requirement": "min_count_1",
+    "severity": "HIGH"
+  },
+  {
+    "id": "GRC-SOX-012",
+    "regulator": "GRC",
+    "description": "Audit trail and control evidence should exist",
+    "field": "clauses",
+    "requirement": "min_count_1",
+    "severity": "MEDIUM"
+  },
+  {
+    "id": "GRC-PCI-013",
+    "regulator": "GRC",
+    "description": "Sensitive financial data handling clause should exist",
+    "field": "data_protection_clauses",
+    "requirement": "min_count_1",
+    "severity": "HIGH"
+  },
+  {
+    "id": "GRC-BASEL3-014",
+    "regulator": "GRC",
+    "description": "Capital/risk discipline indicator should exist",
+    "field": "risk_indicators",
+    "requirement": "min_count_1",
+    "severity": "LOW"
+  },
+  {
+    "id": "GRC-IFRS9-015",
+    "regulator": "GRC",
+    "description": "Credit risk classification markers should exist",
+    "field": "risk_indicators",
+    "requirement": "min_count_1",
+    "severity": "MEDIUM"
+  },
+  {
+    "id": "GRC-COBIT-016",
+    "regulator": "GRC",
+    "description": "Control ownership and governance wording should exist",
+    "field": "clauses",
+    "requirement": "min_count_1",
+    "severity": "LOW"
+  },
+  {
+    "id": "GRC-FFIEC-017",
+    "regulator": "GRC",
+    "description": "Operational resilience language should exist",
+    "field": "clauses",
+    "requirement": "min_count_1",
+    "severity": "LOW"
+  },
+  {
+    "id": "GRC-SOC2-018",
+    "regulator": "GRC",
+    "description": "Confidentiality and security commitments should exist",
+    "field": "data_protection_clauses",
+    "requirement": "min_count_1",
+    "severity": "MEDIUM"
+  },
+  {
+    "id": "GRC-PDPA-019",
+    "regulator": "GRC",
+    "description": "Data retention and consent controls should exist",
+    "field": "consent_clauses",
+    "requirement": "min_count_1",
+    "severity": "MEDIUM"
+  },
+  {
+    "id": "GRC-NYDFS-020",
+    "regulator": "GRC",
+    "description": "Cyber policy and incident notice markers should exist",
+    "field": "clauses",
+    "requirement": "min_count_1",
+    "severity": "LOW"
+  },
+  {
+    "id": "GRC-MAS-021",
+    "regulator": "GRC",
+    "description": "Technology risk controls should exist",
+    "field": "risk_indicators",
+    "requirement": "min_count_1",
+    "severity": "LOW"
+  },
+  {
+    "id": "GRC-EBA-022",
+    "regulator": "GRC",
+    "description": "Model risk governance marker should exist",
+    "field": "risk_indicators",
+    "requirement": "min_count_1",
+    "severity": "LOW"
+  },
+  {
+    "id": "GRC-APRA-023",
+    "regulator": "GRC",
+    "description": "Prudential risk governance marker should exist",
+    "field": "clauses",
+    "requirement": "min_count_1",
+    "severity": "LOW"
+  },
+  {
+    "id": "GRC-BIS-024",
+    "regulator": "GRC",
+    "description": "Supervisory transparency marker should exist",
+    "field": "clauses",
+    "requirement": "min_count_1",
+    "severity": "LOW"
+  },
+  {
+    "id": "GRC-CSA-025",
+    "regulator": "GRC",
+    "description": "Cloud control and third-party obligations should exist",
+    "field": "obligations",
+    "requirement": "min_count_1",
+    "severity": "MEDIUM"
+  }
+]

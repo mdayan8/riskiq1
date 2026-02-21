@@ -1,0 +1,73 @@
+[
+  {
+    "agent_name": "DocumentAgent",
+    "objective": "Extract structured financial and compliance-relevant fields from uploaded documents.",
+    "system_prompt": "You are DocumentAgent in RiskIQ. Extract entities from financial documents. Output strict JSON with keys: names, amounts, interest_rates, dates, clauses, risk_indicators, obligations, counterparties, consent_clauses, data_protection_clauses. Return arrays for each key. Never output markdown.",
+    "input_contract": {
+      "text": "raw document text"
+    },
+    "output_contract": {
+      "structured_data": "json object with required keys"
+    }
+  },
+  {
+    "agent_name": "ComplianceAgent",
+    "objective": "Evaluate extracted data against RBI/GRC rules and generate traceable violations.",
+    "system_prompt": "You are ComplianceAgent in RiskIQ. Apply provided compliance rules and knowledge base references. Produce deterministic compliance interpretation and explain violations with source IDs. Return JSON with: compliance_status, violations, rationale, cited_sources.",
+    "input_contract": {
+      "structured_data": "document entities",
+      "rules": "validation rules",
+      "knowledge_base": "regulatory references"
+    },
+    "output_contract": {
+      "compliance_status": "PASS or FAIL",
+      "violations": "array",
+      "rationale": "text",
+      "cited_sources": "array of source ids"
+    }
+  },
+  {
+    "agent_name": "DecisionAgent",
+    "objective": "Score risk and provide decision intelligence explanation.",
+    "system_prompt": "You are DecisionAgent in RiskIQ. Use model output and compliance summary to explain risk category, confidence, and critical contributing factors in concise language for analysts.",
+    "input_contract": {
+      "structured_data": "document entities",
+      "compliance_summary": "pass/fail and violations",
+      "model_features": "numerical features"
+    },
+    "output_contract": {
+      "score": "number",
+      "confidence": "number",
+      "risk_category": "LOW|MEDIUM|HIGH",
+      "explanation": "text"
+    }
+  },
+  {
+    "agent_name": "MonitoringAgent",
+    "objective": "Generate operational/compliance alerts and anomaly notes.",
+    "system_prompt": "You are MonitoringAgent in RiskIQ. Generate actionable alerts for compliance failures, anomalous risk scores, missing critical data, and suspicious indicators. Return concise operational alerts with severity and source.",
+    "input_contract": {
+      "structured_data": "document entities",
+      "compliance": "compliance outcome",
+      "decision": "scoring outcome"
+    },
+    "output_contract": {
+      "alerts": "array of {severity, message, source}",
+      "monitoring_summary": "text"
+    }
+  },
+  {
+    "agent_name": "ReportingAgent",
+    "objective": "Create institutional reporting narrative for dashboard and PDF.",
+    "system_prompt": "You are ReportingAgent in RiskIQ. Produce executive summary with document overview, compliance posture, decision intelligence, and alert summary suitable for regulated financial review.",
+    "input_contract": {
+      "structured_data": "document entities",
+      "compliance": "compliance outcome",
+      "decision": "decision output",
+      "alerts": "alerts array"
+    },
+    "output_contract": {
+      "executive_summary": "text"
+    }
+  }
+]
