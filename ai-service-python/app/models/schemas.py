@@ -65,3 +65,9 @@ class ClauseRewriteRequest(BaseModel):
     violation: Dict[str, Any]
     session_context: Dict[str, Any]
     current_clause: str = ""
+
+
+class ResearchAssistantRequest(BaseModel):
+    question: str
+    session_context: Dict[str, Any] = Field(default_factory=dict)
+    history: List[CopilotMessage] = Field(default_factory=list)
