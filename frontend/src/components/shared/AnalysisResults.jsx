@@ -15,7 +15,7 @@ import {
   Cpu,
   ScanSearch
 } from "lucide-react";
-import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { cn } from "../../lib/utils";
 import { api } from "../../lib/api";
 
@@ -44,6 +44,13 @@ export default function AnalysisResults({ result }) {
     }
     return stats;
   }, [violations]);
+  const rfBars = useMemo(
+    () => (result.decision?.rf_feature_contributions || []).slice(0, 5).map((i) => ({
+      feature: String(i.feature || "").replaceAll("_", " "),
+      weight: Number(i.local_weight_pct || 0)
+    })),
+    [result.decision?.rf_feature_contributions]
+  );
 
   const downloadReport = async () => {
     const documentRef = result.document_id;
@@ -151,6 +158,20 @@ export default function AnalysisResults({ result }) {
             <span className="text-[10px] px-2 py-1 rounded bg-slate-100 text-slate-700 font-semibold">Source Score: {((result.decision?.verification?.source_risk_score ?? 0) * 100).toFixed(1)}%</span>
             <span className="text-[10px] px-2 py-1 rounded bg-slate-100 text-slate-700 font-semibold">Fraud Signal: {((result.decision?.fraud_score ?? 0) * 100).toFixed(1)}%</span>
           </div>
+
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Risk Tier Logic</p>
+            <p className="text-[11px] text-slate-700 mt-1">
+              {(result.decision?.methodology?.name || "72/2 Outlier Calibration")}:
+              {" "}LOW &lt; 0.40, MEDIUM 0.40-0.74, HIGH ≥ 0.75.
+            </p>
+            <p className="text-[11px] text-slate-700 mt-1">
+              High anchor: {result.decision?.methodology?.high_anchor ?? 0.72} | Outlier trigger: {result.decision?.methodology?.outlier_trigger_sigma ?? 2.0}σ
+            </p>
+            <p className="text-[11px] text-slate-600 mt-1">
+              Outlier score: {result.decision?.drivers?.outlier_score ?? "NA"} ({result.decision?.drivers?.outlier_triggered ? "triggered" : "not triggered"})
+            </p>
+          </div>
         </div>
 
         <div className="card p-6">
@@ -170,6 +191,24 @@ export default function AnalysisResults({ result }) {
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="card p-6">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">RandomForest Fraud Drivers</h3>
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={rfBars} layout="vertical" margin={{ left: 10, right: 10, top: 4, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" />
+                <XAxis type="number" tick={{ fontSize: 10 }} />
+                <YAxis type="category" dataKey="feature" width={120} tick={{ fontSize: 10 }} />
+                <Tooltip formatter={(v) => `${v}%`} />
+                <Bar dataKey="weight" fill="#2E6CF6" radius={[4, 4, 4, 4]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="text-[11px] text-slate-500 mt-2">
+            Chart shows local weighted contribution share used by RandomForest fraud scoring.
+          </p>
         </div>
 
         <div className="card p-6">
@@ -235,6 +274,18 @@ export default function AnalysisResults({ result }) {
                     <span className="text-[9px] bg-error text-white px-1.5 py-0.5 rounded uppercase font-black">{v.severity}</span>
                   </div>
                   <p className="text-xs text-gray-700 leading-snug">{v.message}</p>
+                  <div className="mt-2 rounded-lg border border-red-100 bg-white p-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-red-700">Why Flagged</p>
+                    <p className="text-[11px] text-slate-700 mt-1">{v.why_flagged || "Rule condition was not satisfied by extracted evidence."}</p>
+                    <div className="mt-2 grid grid-cols-1 gap-1 text-[11px] text-slate-600">
+                      <p><span className="font-semibold text-slate-700">Expected:</span> {v.expected || "Required evidence must be present."}</p>
+                      <p><span className="font-semibold text-slate-700">Found:</span> {typeof v.found_count === "number" ? `${v.found_count} item(s)` : "Not available"}</p>
+                      {Array.isArray(v.found_preview) && v.found_preview.length > 0 && (
+                        <p><span className="font-semibold text-slate-700">Evidence Preview:</span> {v.found_preview.map((p) => String(p)).join(" | ")}</p>
+                      )}
+                      <p><span className="font-semibold text-slate-700">Fix:</span> {v.suggestion || "Add explicit compliant clause/data and re-run analysis."}</p>
+                    </div>
+                  </div>
                 </div>
               ))}
               {!violations.length && (

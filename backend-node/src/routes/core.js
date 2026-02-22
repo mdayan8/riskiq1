@@ -9,7 +9,7 @@ import { requireAuth, requireRole } from "../middleware/auth.js";
 import { upload } from "../utils/upload.js";
 import { runWorkflow, runWorkflowWithHooks } from "../services/orchestrator.js";
 import { scrapeRegulatoryKnowledge } from "../services/knowledgeScraper.js";
-import { generateCombinedReport, generateReport } from "../services/aiService.js";
+import { generateCombinedReport, generateReport, sessionCopilot } from "../services/aiService.js";
 import {
   completeWorkflowJob,
   createWorkflowJob,
@@ -19,6 +19,8 @@ import {
 } from "../services/workflowJobs.js";
 
 const router = express.Router();
+const sessionCopilotCache = new Map();
+const SESSION_COPILOT_CACHE_TTL_MS = 2 * 60 * 1000;
 
 function summarizeSimulation(submissionRows, sessions) {
   const scoreValues = submissionRows
@@ -626,6 +628,116 @@ router.post("/sessions/:id/report", requireAuth, async (req, res, next) => {
     }
     const report = await ensureSessionReportForUser(sessionResult.rows[0], req.user.id);
     return res.status(201).json({ report, session_id: req.params.id });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const copilotSchema = z.object({
+  question: z.string().min(3).max(1000),
+  history: z.array(z.object({
+    role: z.enum(["user", "assistant"]),
+    content: z.string().min(1).max(4000)
+  })).max(12).optional()
+});
+
+function buildSessionCopilotContext(session) {
+  const result = session.result_json || {};
+  const extracted = result.extracted_data || {};
+  const compliance = result.compliance || {};
+  const decision = result.decision || {};
+  const alerts = result.alerts || [];
+  const references = result.standard_references || [];
+  const suggestions = result.suggestions || [];
+
+  const entities = Object.fromEntries(
+    Object.entries(extracted)
+      .filter(([, v]) => Array.isArray(v))
+      .map(([k, v]) => [k, v.slice(0, 10)])
+  );
+
+  return {
+    session_id: session.id,
+    file_name: session.file_name,
+    status: session.status,
+    current_stage: session.current_stage,
+    decision: {
+      score: decision.score,
+      risk_category: decision.risk_category,
+      confidence: decision.confidence,
+      fraud_score: decision.fraud_score,
+      fraud_label: decision.fraud_label,
+      explanation: decision.explanation,
+      verification: decision.verification || {}
+    },
+    compliance: {
+      summary: compliance.summary || {},
+      violations: (compliance.violations || []).slice(0, 12)
+    },
+    alerts: alerts.slice(0, 12),
+    extracted_entities: entities,
+    standard_references: references.slice(0, 8),
+    suggestions: suggestions.slice(0, 6)
+  };
+}
+
+function enrichCopilotCitations(citations, context) {
+  if (!Array.isArray(citations)) return [];
+  const refs = context.standard_references || [];
+  const refMap = new Map(refs.map((r) => [String(r.source_id || ""), r.source_url]).filter(([k, v]) => k && v));
+  return citations.map((c) => {
+    const id = String(c?.id || "");
+    const hasLink = typeof c?.link === "string" && c.link.trim().length > 0;
+    let link = hasLink ? c.link : "";
+    if (!link && id && refMap.has(id)) link = refMap.get(id) || "";
+    return {
+      type: c?.type || "reference",
+      id: c?.id || "",
+      evidence: c?.evidence || "",
+      link
+    };
+  });
+}
+
+router.post("/sessions/:id/copilot", requireAuth, async (req, res, next) => {
+  try {
+    const payload = copilotSchema.parse(req.body);
+    const sessionResult = await pgPool.query(
+      `SELECT id, file_name, status, current_stage, result_json
+       FROM workflow_sessions
+       WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (sessionResult.rowCount === 0) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    const session = sessionResult.rows[0];
+    const context = buildSessionCopilotContext(session);
+    if (!context.decision?.score && !(context.compliance?.summary?.violations_count >= 0)) {
+      return res.status(400).json({ error: "Session has no completed analysis context yet" });
+    }
+
+    const questionKey = payload.question.trim().toLowerCase();
+    const cacheKey = `${req.user.id}:${session.id}:${session.status}:${questionKey}`;
+    const cached = sessionCopilotCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < SESSION_COPILOT_CACHE_TTL_MS) {
+      return res.json(cached.data);
+    }
+
+    const copilot = await sessionCopilot({
+      question: payload.question,
+      history: payload.history || [],
+      session_context: context
+    });
+
+    const responsePayload = {
+      answer: copilot.answer || "",
+      citations: enrichCopilotCitations(copilot.citations, context),
+      follow_up: copilot.follow_up || ""
+    };
+    sessionCopilotCache.set(cacheKey, { ts: Date.now(), data: responsePayload });
+    return res.json(responsePayload);
   } catch (error) {
     next(error);
   }

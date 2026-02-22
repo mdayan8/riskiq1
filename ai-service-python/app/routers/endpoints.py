@@ -1,12 +1,13 @@
 from fastapi import APIRouter
-from app.models.schemas import AnalyzeRequest, ComplianceRequest, DecisionRequest, ReportRequest, OrchestrateRequest, CombinedReportRequest
+from app.models.schemas import AnalyzeRequest, ComplianceRequest, DecisionRequest, ReportRequest, OrchestrateRequest, CombinedReportRequest, SessionCopilotRequest
 from app.services.extract_service import extract_document_text, normalize_output
-from app.services.deepseek_service import extract_structured_data
+from app.services.deepseek_service import extract_structured_data, session_copilot
 from app.services.rules_loader import load_rules
 from app.services.compliance_service import validate_rules
 from app.services.decision_service import score_decision
 from app.services.report_service import generate_report, generate_combined_report
 from app.services.agent_orchestrator import orchestrate_agents
+from app.services.web_scrape_service import scrape_reference_url
 
 router = APIRouter()
 
@@ -74,3 +75,26 @@ def combined_report(payload: CombinedReportRequest):
         submissions=payload.submissions,
         analysis_summary=payload.analysis_summary,
     )
+
+
+@router.post("/session-copilot")
+def session_copilot_answer(payload: SessionCopilotRequest):
+    parsed, raw = session_copilot(
+        question=payload.question,
+        session_context=payload.session_context,
+        history=[m.model_dump() for m in payload.history],
+    )
+    return {
+        "answer": parsed.get("answer", ""),
+        "citations": parsed.get("citations", []),
+        "follow_up": parsed.get("follow_up", ""),
+        "raw": raw,
+    }
+
+
+@router.post("/scrape-reference")
+def scrape_reference(payload: dict):
+    url = str(payload.get("url", "")).strip()
+    if not url:
+        return {"error": "Missing url"}
+    return scrape_reference_url(url)

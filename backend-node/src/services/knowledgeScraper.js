@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { env } from "../config/env.js";
 
 function loadCuratedSources() {
   try {
@@ -30,6 +31,28 @@ function extractFirstParagraph(html) {
 }
 
 async function fetchSummary(url) {
+  // Primary path: BeautifulSoup scraper in AI service.
+  try {
+    const response = await fetch(`${env.pythonServiceUrl}/scrape-reference`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+      signal: AbortSignal.timeout(20000)
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        scraped_title: data.scraped_title || "",
+        scraped_summary: data.scraped_summary || "",
+        fetch_status: data.fetch_status || "ok",
+        fetch_http_status: data.fetch_http_status || 200,
+        fetch_latency_ms: data.fetch_latency_ms || 0
+      };
+    }
+  } catch {
+    // Fallback to lightweight local parser below.
+  }
+
   try {
     const startedAt = Date.now();
     const response = await fetch(url, { signal: AbortSignal.timeout(15000) });

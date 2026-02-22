@@ -89,6 +89,26 @@ def _bucket(score: float):
     return "LOW"
 
 
+def _escalate_bucket(bucket: str):
+    if bucket == "LOW":
+        return "MEDIUM"
+    if bucket == "MEDIUM":
+        return "HIGH"
+    return "HIGH"
+
+
+def _outlier_signal(loan_amount_log: float, interest_rate: float, risks: int, violations: int, clauses_count: int, fraud_score: float):
+    # 72/2 calibration: 0.72 acts as high-risk anchor and 2.0 sigma-equivalent outlier lifts category.
+    z_loan = (loan_amount_log - 5.5) / 1.25
+    z_rate = (interest_rate - 12.0) / 7.5
+    z_risks = (risks - 1.5) / 1.6
+    z_viol = (violations - 1.0) / 1.3
+    z_clauses = (clauses_count - 4.0) / 2.4
+    z_fraud = (fraud_score - 0.45) / 0.22
+    composite = 0.20 * z_loan + 0.20 * z_rate + 0.20 * z_risks + 0.22 * z_viol - 0.12 * z_clauses + 0.30 * z_fraud
+    return float(composite)
+
+
 def score_decision(extracted_data: Dict[str, Any], compliance_summary: Dict[str, Any]):
     loan_amount = _first_number(extracted_data.get("amounts", []), 0.0)
     interest_rate = _first_number(extracted_data.get("interest_rates", []), 0.0)
@@ -133,6 +153,12 @@ def score_decision(extracted_data: Dict[str, Any], compliance_summary: Dict[str,
 
     risk_category = _bucket(risk_score)
     fraud_label = _bucket(fraud_score)
+    outlier_score = _outlier_signal(loan_amount_log, interest_rate_safe, risks, violations, clauses_count, fraud_score)
+    outlier_triggered = outlier_score >= 2.0
+    high_anchor_triggered = risk_score >= 0.72
+    if outlier_triggered and risk_category != "HIGH":
+        risk_category = _escalate_bucket(risk_category)
+
     confidence = round(
         _clip(
             0.45
@@ -148,6 +174,27 @@ def score_decision(extracted_data: Dict[str, Any], compliance_summary: Dict[str,
     if violations == 0 and fraud_score < 0.50 and risk_score >= 0.75:
         risk_category = "MEDIUM"
 
+    feature_names = [
+        "loan_amount_log",
+        "interest_rate",
+        "risk_indicators",
+        "violations",
+        "clauses_count",
+    ]
+    rf_importance = FRAUD_MODEL.feature_importances_.tolist()
+    local_values = [loan_amount_log, interest_rate_safe, float(risks), float(violations), float(clauses_count)]
+    weighted = [abs(v) * imp for v, imp in zip(local_values, rf_importance)]
+    total_weight = sum(weighted) or 1.0
+    rf_feature_contributions = [
+        {
+            "feature": name,
+            "importance": round(float(imp), 4),
+            "local_weight_pct": round(float((w / total_weight) * 100.0), 2),
+        }
+        for name, imp, w in zip(feature_names, rf_importance, weighted)
+    ]
+    rf_feature_contributions.sort(key=lambda x: x["local_weight_pct"], reverse=True)
+
     return {
         "score": round(risk_score, 4),
         "fraud_score": round(fraud_score, 4),
@@ -160,7 +207,20 @@ def score_decision(extracted_data: Dict[str, Any], compliance_summary: Dict[str,
             "risk_indicators": risks,
             "fraud_signal": round(fraud_score, 4),
             "missing_core_fields": missing_core,
+            "outlier_score": round(outlier_score, 4),
+            "outlier_triggered": outlier_triggered,
+            "high_anchor_triggered_72": high_anchor_triggered,
         },
+        "methodology": {
+            "name": "72/2 Outlier Calibration",
+            "summary": "Risk tiers are calibrated with a 0.72 high-risk anchor and an outlier escalation trigger at 2.0 composite z-score.",
+            "tier_thresholds": {"LOW": "< 0.40", "MEDIUM": "0.40 to < 0.75", "HIGH": ">= 0.75"},
+            "high_anchor": 0.72,
+            "outlier_trigger_sigma": 2.0,
+            "outlier_score": round(outlier_score, 4),
+            "outlier_triggered": outlier_triggered,
+        },
+        "rf_feature_contributions": rf_feature_contributions,
         "features": {
             "loan_amount": loan_amount,
             "interest_rate": interest_rate,

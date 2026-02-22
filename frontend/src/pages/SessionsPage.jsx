@@ -15,6 +15,7 @@ import {
 import { api } from "../lib/api";
 import { cn } from "../lib/utils";
 import AnalysisResults from "../components/shared/AnalysisResults";
+import SessionCopilot from "../components/shared/SessionCopilot";
 
 export default function SessionsPage() {
   const [sessions, setSessions] = useState([]);
@@ -265,8 +266,28 @@ export default function SessionsPage() {
                 </div>
               </div>
 
+              {selected.result_json?.decision?.methodology && (
+                <div className="card p-4 bg-slate-50/70 border-slate-200">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">
+                    Risk Methodology
+                  </p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {selected.result_json.decision.methodology.name}
+                  </p>
+                  <p className="text-xs text-slate-600 mt-1">
+                    LOW &lt; 0.40, MEDIUM 0.40-0.74, HIGH ≥ 0.75. High anchor {selected.result_json.decision.methodology.high_anchor ?? 0.72}, outlier trigger {selected.result_json.decision.methodology.outlier_trigger_sigma ?? 2.0}σ.
+                  </p>
+                  <p className="text-xs text-slate-600 mt-1">
+                    Current outlier score: {selected.result_json.decision?.drivers?.outlier_score ?? "NA"} ({selected.result_json.decision?.drivers?.outlier_triggered ? "triggered" : "not triggered"}).
+                  </p>
+                </div>
+              )}
+
               {selected.result_json ? (
-                <AnalysisResults result={selected.result_json} />
+                <div className="space-y-6">
+                  <AnalysisResults result={selected.result_json} />
+                  <SessionCopilot sessionId={selected.id} />
+                </div>
               ) : selected.error_text ? (
                 <div className="card p-10 text-center bg-red-50/30 border-red-100">
                   <AlertCircle className="w-12 h-12 text-error mx-auto mb-4" />

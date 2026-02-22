@@ -48,3 +48,14 @@ class CombinedReportRequest(BaseModel):
     regulator: str = "RBI"
     submissions: List[Dict[str, Any]] = Field(default_factory=list)
     analysis_summary: Dict[str, Any] = Field(default_factory=dict)
+
+
+class CopilotMessage(BaseModel):
+    role: str
+    content: str
+
+
+class SessionCopilotRequest(BaseModel):
+    question: str
+    session_context: Dict[str, Any]
+    history: List[CopilotMessage] = Field(default_factory=list)

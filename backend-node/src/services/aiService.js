@@ -35,3 +35,8 @@ export async function generateCombinedReport(payload) {
   const { data } = await client.post("/generate-combined-report", payload);
   return data;
 }
+
+export async function sessionCopilot(payload) {
+  const { data } = await client.post("/session-copilot", payload);
+  return data;
+}
