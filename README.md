@@ -29,11 +29,42 @@ RiskIQ addresses this by providing an autonomous AI system capable of analyzing 
 
 ---
 
-## 🧠 Core Architecture — Multi-Agent Intelligence System
+## 🏗️ System Architecture
 
 RiskIQ is built on a modular **multi-agent orchestration architecture**, where specialized AI components collaborate to execute complex workflows.
 
-### 🤖 Intelligent Agent Network
+```mermaid
+graph TD
+    User([User / External Systems]) -->|Upload Docs/API| Ingestion[Data Ingestion Layer]
+    
+    subgraph "AI Intelligence Layer (Astra Swarm)"
+        Ingestion --> Nexus{Nexus Core<br/>Orchestrator}
+        Nexus --> Omni[OmniExtract<br/>Neural Parser]
+        Nexus --> Astra[Astra Compliance<br/>Regulatory Agent]
+        Nexus --> Sentinel[Sentinel Risk<br/>Inference Agent]
+        Nexus --> Lexis[Lexis Report<br/>Serialization Agent]
+    end
+    
+    subgraph "Decision & Monitoring"
+        Omni --> Analysis[Analysis Results]
+        Astra --> Analysis
+        Sentinel --> Analysis
+        Analysis --> Decision[Decision Scoring]
+        Decision --> Alerts[Anomalies & Alerts]
+    end
+    
+    subgraph "Data Persistence (Atlas Vault)"
+        Analysis --> Pg[(PostgreSQL<br/>Telemetry & Metadata)]
+        Omni --> Mongo[(MongoDB<br/>Unstructured Data)]
+    end
+    
+    Nexus -->|Final Report| Lexis
+    Lexis -->|Export PDF| Download[/Executive Report/]
+```
+
+---
+
+## � Core Intelligence: The Astra Swarm
 
 - **Nexus Core (Orchestrator)**  
   Central coordination engine responsible for workflow routing, agent communication, and execution sequencing.
@@ -41,239 +72,76 @@ RiskIQ is built on a modular **multi-agent orchestration architecture**, where s
 - **OmniExtract (Document Intelligence Agent)**  
   AI-powered parsing and semantic extraction engine that converts unstructured documents into structured insights.
 
-- **Compliance Engine (Regulatory Agent)**  
-  Evaluates extracted data against regulatory and governance rules to compute compliance indicators and observations.
+- **Astra Compliance (Regulatory Agent)**  
+  Evaluates extracted data against regulatory and governance rules to compute compliance indicators.
 
-- **Sentinel Monitor (Monitoring Agent)**  
-  Performs anomaly detection, threshold monitoring, and continuous evaluation of outputs.
+- **Sentinel Risk (Inference Agent)**  
+  Performs anomaly detection, threshold monitoring, and machine-learning-based fraud probability scoring.
 
-- **LexisReport (Reporting Agent)**  
-  Generates structured insights, summaries, and downloadable executive reports.
+- **Lexis Report (Reporting Agent)**  
+  Generates high-fidelity summaries and downloadable executive PDF reports with deterministic fallbacks.
 
 - **Atlas Vault (Data Layer)**  
-  Hybrid storage architecture supporting structured telemetry and unstructured extraction data.
-
----
-
-## 🏗️ System Architecture Layers
-
-RiskIQ follows a layered architecture model:
-
-1. **Data Ingestion Layer**
-   - Document uploads
-   - Structured datasets
-   - External data integration
-
-2. **AI Intelligence Layer**
-   - DeepSeek semantic reasoning
-   - Machine learning prediction models
-   - Feature engineering pipelines
-
-3. **Agent Orchestration Layer**
-   - Multi-agent coordination
-   - Context sharing
-   - Autonomous execution
-
-4. **Decision & Monitoring Layer**
-   - Scoring mechanisms
-   - Alerts
-   - Continuous evaluation
-
-5. **Application & Visualization Layer**
-   - Enterprise dashboard
-   - Session tracking
-   - Reports and analytics
+  Hybrid storage architecture supporting structured telemetry (Postgres) and deep-extraction storage (MongoDB).
 
 ---
 
 ## 💎 Platform Capabilities
 
 ### 📄 Document Intelligence
-- Semantic clause extraction
-- Context understanding
-- Insight generation
+- Semantic clause extraction and context understanding.
+- Grounded evidence mapping with full citation support.
 
 ### 📊 Decision Analytics
-- Predictive scoring models
-- Confidence indicators
-- Data-driven recommendations
-
-### 🔍 Compliance Intelligence
-- Rule-based and AI-assisted evaluation
-- Structured observations
-- Health scoring
+- Predictive scoring models (Decision-Level Random Forest).
+- Confidence indicators and real-time risk intensity gauging.
 
 ### 🔁 Continuous Monitoring
-- Re-evaluation loops
-- Alerts and anomaly detection
-- Adaptive monitoring capability
-
-### 📑 Automated Reporting
-- Executive summaries
-- Downloadable PDF reports
-- Insight explanations
-
----
-
-## 🖥️ Enterprise User Experience
-
-RiskIQ provides a premium SaaS-style interface designed for clarity, transparency, and operational control.
-
-Key UI features include:
-
-- Session-based workflow tracking
-- Agent execution visibility
-- Real-time progress timelines
-- Interactive dashboards
-- Monitoring controls
-- Report management system
-
-The interface emphasizes explainability and trust in AI decisions.
+- Autonomous re-evaluation loops and real-time alert streams.
+- Adaptive monitoring capability across global session data.
 
 ---
 
 ## 🛠️ Technology Stack
 
-### Frontend
-- React.js + Vite
-- Tailwind CSS
-- Recharts (data visualization)
-- Lucide Icons
+### **Frontend Resilience**
+- **React.js + Vite** for low-latency state management.
+- **Tailwind CSS** for a premium "Authoritative UI" aesthetic.
+- **Recharts** for wide-aspect temporal analytics.
 
-### Backend
-- Node.js + Express
-- RESTful API architecture
-- Zod schema validation
+### **Backend Orchestration**
+- **Node.js + Express** for high-concurrency agent routing.
+- **Zod** schema validation for cross-agent state integrity.
 
-### AI & Machine Learning
-- DeepSeek (semantic reasoning)
-- Random Forest / classical ML models
-- Feature engineering pipelines
-
-### Data Persistence
-- PostgreSQL (structured data & telemetry)
-- MongoDB (document intelligence storage)
-
----
-
-## 📊 Performance Characteristics
-
-| Feature | Capability |
-|---------|-----------|
-Multi-Agent Processing | Autonomous workflow execution |
-AI Reasoning | Semantic document intelligence |
-Scalability | Modular microservice architecture |
-Response Time | Real-time processing pipeline |
-UI Experience | Enterprise-grade dashboard |
-
----
-
-## 🔐 Security & Reliability Considerations
-
-- Modular deployment architecture
-- Secure API communication
-- Environment-based configuration
-- Data integrity safeguards
-- Fail-safe reporting mechanisms
+### **Data Persistence**
+- **PostgreSQL** (Grounded telemetry & session metadata).
+- **MongoDB** (High-depth document extraction storage).
 
 ---
 
 ## 🏁 Getting Started
 
-### 1️⃣ Clone Repository
-
+### 1️⃣ Clone & Install
 ```bash
 git clone <repository-url>
-cd riskiq
-2️⃣ Install Dependencies
+cd riskiq/frontend && npm install
+cd ../backend-node && npm install
+```
 
-Frontend:
+### 2️⃣ Configure Environment
+Create `.env` files in both directories with your DB credentials and AI API keys.
 
-cd frontend
-npm install
-
-Backend:
-
-cd backend-node
-npm install
-3️⃣ Configure Environment
-
-Create .env files with:
-
-Database credentials
-
-AI API keys
-
-Server configuration
-
-4️⃣ Run Development Servers
-npm run dev
-🧪 Demonstration Workflow
-
-Upload a document or dataset
-
-Initialize agent processing
-
-View insights and analytics
-
-Monitor outputs and alerts
-
-Generate reports
-
-🌍 Potential Applications
-
-NBFCs and lending platforms
-
-Financial compliance teams
-
-Risk analysis departments
-
-Regulatory technology solutions
-
-Enterprise decision support systems
-
-🔮 Future Enhancements
-
-Real-time regulatory update monitoring
-
-Predictive impact simulation
-
-Explainable AI reasoning panels
-
-External API integrations
-
-Cloud-native deployment scaling
-
-👥 Team
-
-Developed as part of an innovation initiative exploring autonomous AI architectures for financial intelligence and compliance automation.
-
-🏆 Vision
-
-RiskIQ represents a step toward the future of intelligent financial systems — where AI agents collaborate to transform data into trustworthy decisions.
-
-RiskIQ — Autonomous Intelligence for Financial Systems
-
+### 3️⃣ Execute Swarm
+```bash
+# Start Backend
+cd backend-node && npm run dev
+# Start Frontend
+cd frontend && npm run dev
+```
 
 ---
 
-# ✅ What This Version Improves
+## 🏆 Vision
+RiskIQ represents a step toward the future of intelligent financial systems — where AI agents collaborate to transform fragmented data into trustworthy, executive-ready decisions.
 
-- More professional tone  
-- Clear architecture explanation  
-- Strong hackathon positioning  
-- Enterprise credibility  
-- Better readability  
-- Judges / recruiters friendly  
-- Startup-ready narrative  
-
----
-
-If you want, I can also provide:
-
-- ⭐ GitHub folder structure  
-- ⭐ Architecture diagram for README  
-- ⭐ Demo screenshots section  
-- ⭐ Badges for hackathon  
-
-Just tell me 👍.
+**RiskIQ — Autonomous Intelligence for Financial Systems** 🛡️🚀
