@@ -66,8 +66,8 @@ function summarizeSimulation(submissionRows, sessions) {
   const readiness = Math.round(readinessRaw);
   const verdict =
     readiness >= 75 ? "READY_WITH_STANDARD_REVIEW" :
-    readiness >= 50 ? "CONDITIONAL_READY_REQUIRES_REMEDIATION" :
-    "NOT_READY_REQUIRES_MAJOR_REMEDIATION";
+      readiness >= 50 ? "CONDITIONAL_READY_REQUIRES_REMEDIATION" :
+        "NOT_READY_REQUIRES_MAJOR_REMEDIATION";
 
   const headline = verdict === "READY_WITH_STANDARD_REVIEW"
     ? "Submission posture is stable with manageable residual risk."
@@ -296,8 +296,7 @@ router.get("/workflow-status/:jobId", requireAuth, async (req, res, next) => {
 router.get("/sessions", requireAuth, async (req, res, next) => {
   try {
     const result = await pgPool.query(
-      `SELECT id, file_name, status, current_stage, created_at, updated_at,
-              result_json->>'document_id' AS document_id
+      `SELECT id, file_name, status, current_stage, result_json, created_at, updated_at
        FROM workflow_sessions
        WHERE user_id = $1
        ORDER BY updated_at DESC`,
@@ -458,7 +457,7 @@ router.get("/compliance-knowledge", requireAuth, async (req, res, next) => {
          FROM compliance_knowledge
          WHERE ${where}
          ORDER BY regulator, title`
-      , params),
+        , params),
       pgPool.query(
         `SELECT external_rule_id, regulator, description, field_name, requirement, severity
          FROM rules
