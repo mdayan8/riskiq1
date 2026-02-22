@@ -1,92 +1,74 @@
-# RiskIQ: Autonomous Multi-Agent Decision Intelligence
+# RiskIQ: Enterprise AI Risk Orchestration 🛡️
 
-[![Premium Design](https://img.shields.io/badge/Design-Harvey%20AI%20Inspired-white?style=flat-square&logo=visual-studio-code&logoColor=black)](https://harvey.ai)
-[![AI Engine](https://img.shields.io/badge/AI%20Engine-DeepSeek%20R1-blue?style=flat-square)](https://deepseek.com)
-[![Logic Layer](https://img.shields.io/badge/ML%20Layer-Scikit--Learn-orange?style=flat-square)](https://scikit-learn.org)
+[![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
+[![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Express](https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Axios](https://img.shields.io/badge/Axios-5A29E4?style=for-the-badge&logo=axios&logoColor=white)](https://axios-http.com/)
 
-**RiskIQ** is an enterprise-grade autonomous compliance and risk orchestration platform. Inspired by the professional minimalism of **Harvey AI**, RiskIQ transforms raw financial documents (PDFs, DOCX, CSVs) into actionable, auditable, and mathematically grounded risk signals.
-
----
-
-## 💎 The "Studio White" Philosophy
-RiskIQ is built with a **Premium SaaS Aesthetic**:
-- **Spacious Minimalism**: Large typography and intentional white-space to reduce reviewer fatigue.
-- **Glassmorphic Components**: Deep shadows and subtle transitions for a high-fidelity interaction experience.
-- **Fluid Grid Architecture**: A responsive "Vault" system that maintains optimal density without structural compression (the "No-Squeeze" rule).
-
-## 🧠 The Intelligence Engine (AI/ML)
-Unlike simple "Wrapper" apps, RiskIQ uses a **Multi-Layer Weighted Ensemble**:
-
-### 1. The Semantic Layer (DeepSeek R1)
-Uses Large Language Models for high-fidelity entity and clause extraction. It identifies counterparties, fiscal metrics, and obligations with reasoning-trace awareness.
-
-### 2. The Decision Layer (Hybrid ML)
-- **Logistic Regression**: Provides a stable, interpretable baseline for core risk probability.
-- **Random Forest (n_estimators=250)**: Detects non-linear fraud patterns and multi-dimensional anomalies that simple rules miss.
-- **72/2 Outlier Calibration**: A proprietary filter using a **0.72 High-Risk Anchor** and a **2.0 Sigma Z-Score trigger** to escalate high-variance outliers.
-
-### 3. The Compliance Layer (Deterministic)
-A GRC rule engine that cross-references extracted data against regulatory frameworks (RBI, BCBS) with automated citation mapping.
+RiskIQ is a high-fidelity, multi-agent AI platform designed for autonomous risk orchestration and real-time inference telemetry. It transforms complex document streams into structured intelligence with authoritative precision.
 
 ---
 
-## 🛠 Multi-Agent Orchestration
-The system utilizes five specialized autonomous agents working in parallel:
+## 🚀 The Core Intelligence Layer
 
-```mermaid
-graph TD
-    A[DocumentAgent] -->|Extracts Features| B[DecisionAgent]
-    A -->|Maps Clauses| C[ComplianceAgent]
-    B -->|Computes Probability| D[ReportingAgent]
-    C -->|Identifies Breaches| D
-    B -->|Flags Drifts| E[MonitoringAgent]
-    D -->|Final Audit| Result[Executive Intelligence Profile]
-```
+RiskIQ is built on the **Astra Swarm Architecture**—a specialized multi-agent system where autonomous units collaborate in parallel to deliver 100% grounded results.
 
-- **Argus Extractor** (Document): DeepSeek-powered feature engineering.
-- **Sentinel Regulator** (Compliance): Rule-engine synchronization.
-- **Orion Scorer** (Decision): Ensemble ML scoring (LogReg + RF).
-- **Pulse Watcher** (Monitoring): Real-time drift and anomaly detection.
-- **Atlas Reporter** (Reporting): C-level summary generation with model traceability.
+### 🤖 The Astra Swarm
+- **Nexus Core**: High-level system orchestration and task routing.
+- **Omni-Extract**: Neural parsing engine for deep document structure extraction.
+- **Astra-Compliance**: Regulatory alignment unit mapped against GVR standards.
+- **Sentinel-Risk**: Inference-based fraud detection and probability scoring.
+- **Lexis-Report**: High-fidelity serialization and PDF executive reporting.
+- **Atlas-Vault**: Multi-layer persistent data architecture.
 
 ---
 
-## 🚀 Tech Stack
+## 💎 Premium Design Philosophy
 
-- **Frontend**: React 18, Vite, Tailwind CSS (Vanilla CSS customization for Harvey AI theme).
-- **Backend API**: Node.js, Express, PostgreSQL (Metadata), MongoDB (Large JSON Artifacts).
-- **AI Service**: Python 3.14, FastAPI, Scikit-Learn (Modeling), DeepSeek API (Extraction).
-- **DevOps**: Docker, Docker Compose, Nginx.
+RiskIQ features an **Authoritative Command Interface** designed to minimize cognitive load while maximizing decision-making clarity.
 
----
-
-## 🔧 Installation & Setup
-
-1. **Clone the Intelligence Vault**:
-   ```bash
-   git clone https://github.com/mdayan8/riskq1.git
-   cd RiskIQ
-   ```
-
-2. **Configure Intelligence Credentials**:
-   Create a `.env` in `ai-service-python`:
-   ```env
-   DEEPSEEK_API_KEY=your_key_here
-   ```
-
-3. **Orchestrate Services**:
-   ```bash
-   docker-compose up -d --build
-   ```
-
-*Detailed local setup instructions are available in [RUN_LOCAL.md](file:///Users/mdayan/Desktop/RiskIQ/RUN_LOCAL.md).*
+- **Intelligence Vault**: A high-fidelity grid system for browsing AI-scrutinized sessions.
+- **Decision Engineering Charts**: Wide-aspect telemetry charts for deep-dive risk analysis.
+- **Grounded Evidence Layer**: Full citation mapping that anchors AI insights to high-fidelity document snippets.
+- **Executive Reporting**: Resilient, fail-safe PDF generation with deterministic data fallbacks.
 
 ---
 
-## 🔒 Security & Privacy
-RiskIQ prioritizes data sovereignty:
-- **Local ML Processing**: Only extraction prompts travel to the LLM; risk scoring and compliance logic execute behind your firewall.
-- **Audit Trails**: Every decision includes a model confidence score and local feature contribution weights.
+## 🛠️ Technical Intelligence Stack
+
+### **Frontend Resilience**
+- **Architecture**: React + Vite (ESM)
+- **Styling**: Tailored Tailwind CSS for glassmorphism and depth.
+- **Data Viz**: Recharts for wide-aspect temporal analytics.
+- **Icons**: Lucide React for consistent semantic iconography.
+
+### **Backend Orchestration**
+- **Runtime**: Node.js (High-concurrency logic).
+- **Inference Engine**: DeepSeek + RandomForest dual-layer verification.
+- **Persistence**: Hybrid PostgreSQL (Relational/Telemetry) + MongoDB (Schema-less Extraction).
+- **Communication**: RESTful API with Zod-validated state management.
 
 ---
-**RiskIQ** | *Precision Intelligence for the Modern Auditor.*
+
+## 📊 Evaluation & Hero Stats
+
+| Capability | Maturity | Technology |
+| :--- | :--- | :--- |
+| **Swarm Orchestration** | Alpha-Grade | Multi-Agent Astra Swarm |
+| **Data Integrity** | Fail-Safe | Deterministic Data Fallbacks |
+| **Response Time** | Ultra-Low | Real-Time Syncing Pipeline |
+| **UX/UI Depth** | High-Fidelity | Premium Command Interface |
+
+---
+
+## 🏁 How to Launch
+
+1. **Clone & Install**: `npm install` in both `/frontend` and `/backend-node`.
+2. **Synchronize Environment**: Configure `.env` with DB and AI credentials.
+3. **Execute Swarm**: Run `npm run dev` to initialize the local inference swarm.
+
+**RiskIQ: Where Intelligence Meets Authority.** 🛡️🏆
