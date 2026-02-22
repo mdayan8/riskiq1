@@ -2,14 +2,15 @@ import express from "express";
 import path from "path";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import pg from "pg";
 import { pgPool } from "../db/postgres.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+import { getMongoDb } from "../db/mongo.js";
 import { upload } from "../utils/upload.js";
 import { runWorkflow, runWorkflowWithHooks } from "../services/orchestrator.js";
 import { scrapeRegulatoryKnowledge } from "../services/knowledgeScraper.js";
-import { generateCombinedReport, generateReport, sessionCopilot } from "../services/aiService.js";
+import { aiHealth, generateCombinedReport, generateReport, rewriteClause, sessionCopilot } from "../services/aiService.js";
 import {
   completeWorkflowJob,
   createWorkflowJob,
@@ -19,9 +20,6 @@ import {
 } from "../services/workflowJobs.js";
 
 const router = express.Router();
-const sessionCopilotCache = new Map();
-const SESSION_COPILOT_CACHE_TTL_MS = 2 * 60 * 1000;
-
 function summarizeSimulation(submissionRows, sessions) {
   const scoreValues = submissionRows
     .map((s) => Number(s.score))
@@ -160,6 +158,27 @@ async function ensureSessionReportForUser(session, userId) {
 
 router.get("/health", (_, res) => {
   res.json({ status: "ok" });
+});
+
+router.get("/health/system", async (_, res) => {
+  try {
+    const health = await aiHealth();
+    return res.json({
+      status: "ok",
+      services: {
+        backend: true,
+        ai: health?.status === "ok"
+      }
+    });
+  } catch {
+    return res.json({
+      status: "degraded",
+      services: {
+        backend: true,
+        ai: false
+      }
+    });
+  }
 });
 
 router.post("/upload", requireAuth, upload.single("document"), async (req, res, next) => {
@@ -649,6 +668,8 @@ function buildSessionCopilotContext(session) {
   const alerts = result.alerts || [];
   const references = result.standard_references || [];
   const suggestions = result.suggestions || [];
+  const documentPreview = result.document_preview || {};
+  const clauseLineMap = result.clause_line_map || [];
 
   const entities = Object.fromEntries(
     Object.entries(extracted)
@@ -677,8 +698,30 @@ function buildSessionCopilotContext(session) {
     alerts: alerts.slice(0, 12),
     extracted_entities: entities,
     standard_references: references.slice(0, 8),
-    suggestions: suggestions.slice(0, 6)
+    suggestions: suggestions.slice(0, 6),
+    document_preview: {
+      line_count: documentPreview.line_count || 0,
+      preview_lines: (documentPreview.preview_lines || []).slice(0, 120)
+    },
+    clause_line_map: clauseLineMap.slice(0, 40)
   };
+}
+
+const clauseRewriteSchema = z.object({
+  rule_id: z.string().min(3),
+  current_clause: z.string().optional()
+});
+
+function inferReferenceLinkById(id, refs) {
+  const token = String(id || "").toUpperCase();
+  if (!token) return "";
+  const exact = refs.find((r) => String(r.source_id || "").toUpperCase() === token);
+  if (exact?.source_url) return exact.source_url;
+
+  const prefix = token.split("-")[0];
+  if (!prefix) return "";
+  const fallback = refs.find((r) => String(r.source_id || "").toUpperCase().includes(prefix));
+  return fallback?.source_url || "";
 }
 
 function enrichCopilotCitations(citations, context) {
@@ -690,6 +733,7 @@ function enrichCopilotCitations(citations, context) {
     const hasLink = typeof c?.link === "string" && c.link.trim().length > 0;
     let link = hasLink ? c.link : "";
     if (!link && id && refMap.has(id)) link = refMap.get(id) || "";
+    if (!link && id) link = inferReferenceLinkById(id, refs);
     return {
       type: c?.type || "reference",
       id: c?.id || "",
@@ -699,9 +743,172 @@ function enrichCopilotCitations(citations, context) {
   });
 }
 
+function tokenizeForSearch(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length > 2);
+}
+
+function normalizeIntentText(text) {
+  return String(text || "").toLowerCase().trim();
+}
+
+function isGreetingOnly(text) {
+  const q = normalizeIntentText(text).replace(/[^a-z0-9\s]/g, " ").trim();
+  const compact = q.replace(/\s+/g, "");
+  const greetings = new Set(["hi", "hii", "hlo", "hello", "hey", "hola", "yo"]);
+  if (greetings.has(compact)) return true;
+  const tokens = q.split(/\s+/).filter(Boolean);
+  return tokens.length <= 2 && tokens.every((t) => greetings.has(t));
+}
+
+function isAnalysisIntent(text) {
+  const q = normalizeIntentText(text);
+  return [
+    "risk",
+    "compliance",
+    "violation",
+    "score",
+    "flag",
+    "explain",
+    "why",
+    "issue",
+    "fix",
+    "rewrite",
+    "report",
+    "rbi",
+    "grc",
+    "alert"
+  ].some((k) => q.includes(k));
+}
+
+function scoreTextOverlap(a, b) {
+  const aTokens = new Set(tokenizeForSearch(a));
+  const bTokens = tokenizeForSearch(b);
+  if (!aTokens.size || !bTokens.length) return 0;
+  let hit = 0;
+  for (const token of bTokens) {
+    if (aTokens.has(token)) hit += 1;
+  }
+  return hit;
+}
+
+function findBestLineForViolation(violation, clauseLineMap) {
+  const lines = Array.isArray(clauseLineMap) ? clauseLineMap : [];
+  if (!lines.length) return null;
+  const target = `${violation?.message || ""} ${violation?.expected || ""}`;
+  let best = null;
+  let bestScore = 0;
+  for (const row of lines) {
+    const lineText = `${row?.clause || ""} ${row?.match || ""}`;
+    const score = scoreTextOverlap(target, lineText);
+    if (score > bestScore) {
+      bestScore = score;
+      best = row;
+    }
+  }
+  return bestScore > 0 ? best : lines.find((row) => Number(row?.line) > 0) || null;
+}
+
+function buildEvidenceCards(context) {
+  const cards = [];
+  const decision = context.decision || {};
+  const compliance = context.compliance || {};
+  const refs = context.standard_references || [];
+  const lines = context.document_preview?.preview_lines || [];
+  const clauseLineMap = context.clause_line_map || [];
+
+  cards.push({
+    type: "decision",
+    id: "decision-summary",
+    evidence: `Risk ${decision.risk_category || "NA"}, score=${decision.score}, confidence=${decision.confidence}, fraud=${decision.fraud_score}`,
+    link: ""
+  });
+  cards.push({
+    type: "compliance",
+    id: "compliance-summary",
+    evidence: `Status=${compliance.summary?.status || "NA"}, violations=${compliance.summary?.violations_count || 0}`,
+    link: ""
+  });
+
+  (compliance.violations || []).slice(0, 20).forEach((v, idx) => {
+    const bestLine = findBestLineForViolation(v, clauseLineMap);
+    const lineHint = Number(bestLine?.line || 0);
+    const lineText = lineHint ? (lines.find((ln) => Number(ln.line) === lineHint)?.text || "") : "";
+    cards.push({
+      type: "violation",
+      id: v.rule_id || `violation-${idx + 1}`,
+      evidence: `${v.severity || "MEDIUM"} violation: ${v.message || "Violation"} | expected: ${v.expected || "N/A"} | found: ${v.found_count ?? "N/A"}${lineHint ? ` | line ${lineHint}: ${lineText}` : ""}`,
+      link: inferReferenceLinkById(v.rule_id, refs)
+    });
+  });
+
+  (context.alerts || []).slice(0, 10).forEach((a, idx) => {
+    cards.push({
+      type: "alert",
+      id: `alert-${idx + 1}`,
+      evidence: `${a.severity || "MEDIUM"}: ${a.message || ""}`,
+      link: ""
+    });
+  });
+
+  refs.slice(0, 10).forEach((r) => {
+    cards.push({
+      type: "reference",
+      id: r.source_id || "reference",
+      evidence: `${r.title || r.source_id || "Regulatory source"}`,
+      link: r.source_url || ""
+    });
+  });
+
+  return cards;
+}
+
+function selectTopEvidence(question, cards, topN = 10) {
+  const qTokens = tokenizeForSearch(question);
+  const analysisIntent = isAnalysisIntent(question);
+  const scored = cards.map((card) => {
+    const hay = `${card.type} ${card.id} ${card.evidence}`.toLowerCase();
+    let score = 0;
+    for (const t of qTokens) {
+      if (hay.includes(t)) score += 1;
+    }
+    if (analysisIntent && card.type === "violation") score += 0.25;
+    if (card.type === "reference" && (question.toLowerCase().includes("reference") || question.toLowerCase().includes("source") || question.toLowerCase().includes("link"))) {
+      score += 1.5;
+    }
+    return { card, score };
+  });
+  return scored.sort((a, b) => b.score - a.score).slice(0, topN).map((s) => s.card);
+}
+
+function fallbackCitationsFromEvidence(evidenceCards) {
+  const top = (evidenceCards || []).slice(0, 4).map((e) => ({
+    type: e.type,
+    id: e.id,
+    evidence: e.evidence,
+    link: e.link || ""
+  }));
+  const hasLink = top.some((c) => Boolean(c.link));
+  if (!hasLink) {
+    const linked = (evidenceCards || []).find((e) => e.type === "reference" && e.link);
+    if (linked) top.push({ type: linked.type, id: linked.id, evidence: linked.evidence, link: linked.link });
+  }
+  return top;
+}
+
 router.post("/sessions/:id/copilot", requireAuth, async (req, res, next) => {
   try {
     const payload = copilotSchema.parse(req.body);
+    if (isGreetingOnly(payload.question)) {
+      return res.json({
+        answer: "Hello. I am Astra Copilot. Ask me about risk score, violations, rewrite suggestions, or report evidence for this session.",
+        citations: [],
+        follow_up: "Try: 'Why was this document flagged?'"
+      });
+    }
     const sessionResult = await pgPool.query(
       `SELECT id, file_name, status, current_stage, result_json
        FROM workflow_sessions
@@ -718,26 +925,123 @@ router.post("/sessions/:id/copilot", requireAuth, async (req, res, next) => {
       return res.status(400).json({ error: "Session has no completed analysis context yet" });
     }
 
-    const questionKey = payload.question.trim().toLowerCase();
-    const cacheKey = `${req.user.id}:${session.id}:${session.status}:${questionKey}`;
-    const cached = sessionCopilotCache.get(cacheKey);
-    if (cached && Date.now() - cached.ts < SESSION_COPILOT_CACHE_TTL_MS) {
-      return res.json(cached.data);
-    }
+    const evidenceCards = buildEvidenceCards(context);
+    const topEvidence = selectTopEvidence(payload.question, evidenceCards, 12);
 
     const copilot = await sessionCopilot({
       question: payload.question,
       history: payload.history || [],
-      session_context: context
+      session_context: {
+        ...context,
+        evidence_cards: topEvidence
+      }
     });
 
+    const parsedCitations = enrichCopilotCitations(copilot.citations, context);
+    const citations = parsedCitations.length >= 2 ? parsedCitations : fallbackCitationsFromEvidence(topEvidence);
     const responsePayload = {
       answer: copilot.answer || "",
-      citations: enrichCopilotCitations(copilot.citations, context),
-      follow_up: copilot.follow_up || ""
+      citations,
+      follow_up: copilot.follow_up || "",
+      evidence_cards: topEvidence.slice(0, 8)
     };
-    sessionCopilotCache.set(cacheKey, { ts: Date.now(), data: responsePayload });
     return res.json(responsePayload);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/sessions/:id", requireAuth, async (req, res, next) => {
+  try {
+    const sessionResult = await pgPool.query(
+      `SELECT id, result_json
+       FROM workflow_sessions
+       WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (sessionResult.rowCount === 0) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    const resultJson = sessionResult.rows[0].result_json || {};
+    const documentRef = resultJson.document_id ? String(resultJson.document_id) : "";
+
+    await pgPool.query(`DELETE FROM workflow_sessions WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
+
+    if (documentRef) {
+      await Promise.all([
+        pgPool.query(`DELETE FROM alerts WHERE user_id = $1 AND document_ref = $2`, [req.user.id, documentRef]),
+        pgPool.query(`DELETE FROM decision_scores WHERE user_id = $1 AND document_ref = $2`, [req.user.id, documentRef]),
+        pgPool.query(`DELETE FROM compliance_results WHERE user_id = $1 AND document_ref = $2`, [req.user.id, documentRef]),
+        pgPool.query(`DELETE FROM agent_runs WHERE user_id = $1 AND document_ref = $2`, [req.user.id, documentRef]),
+        pgPool.query(`DELETE FROM reports_metadata WHERE user_id = $1 AND document_ref = $2`, [req.user.id, documentRef])
+      ]);
+
+      try {
+        const mongo = getMongoDb();
+        const mongoId = ObjectId.isValid(documentRef) ? new ObjectId(documentRef) : null;
+        if (mongoId) {
+          await mongo.collection("documents").deleteOne({ _id: mongoId, user_id: req.user.id });
+        }
+      } catch (mongoErr) {
+        console.error("Mongo cleanup failed for session delete:", mongoErr?.message || mongoErr);
+      }
+    }
+
+    return res.json({ status: "deleted", session_id: req.params.id });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/sessions/:id/rewrite-clause", requireAuth, async (req, res, next) => {
+  try {
+    const payload = clauseRewriteSchema.parse(req.body);
+    const sessionResult = await pgPool.query(
+      `SELECT id, file_name, status, current_stage, result_json
+       FROM workflow_sessions
+       WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (sessionResult.rowCount === 0) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+    const session = sessionResult.rows[0];
+    const result = session.result_json || {};
+    const violations = result?.compliance?.violations || [];
+    const violation = violations.find((v) => String(v.rule_id) === payload.rule_id);
+    if (!violation) {
+      return res.status(404).json({ error: "Violation not found in this session" });
+    }
+
+    const clauseLineMap = result.clause_line_map || [];
+    const fallbackClause = clauseLineMap.find((c) => c.line)?.clause || result?.extracted_data?.clauses?.[0] || "";
+    const currentClause = payload.current_clause || fallbackClause || "";
+
+    const rewrite = await rewriteClause({
+      violation,
+      current_clause: currentClause,
+      session_context: {
+        document_profile: result.document_profile || {},
+        decision: result.decision || {},
+        extracted_entities: result.extracted_data || {},
+        standard_references: result.standard_references || []
+      }
+    });
+
+    const lineHint = clauseLineMap.find((c) => String(c.clause || "").slice(0, 80) === String(currentClause).slice(0, 80))
+      || clauseLineMap.find((c) => c.line);
+
+    return res.json({
+      rule_id: payload.rule_id,
+      line_hint: lineHint?.line || null,
+      line_match: lineHint?.match || "none",
+      current_clause: currentClause,
+      replacement_clause: rewrite.replacement_clause || "",
+      plain_language_explanation: rewrite.plain_language_explanation || "",
+      risk_reduction_summary: rewrite.risk_reduction_summary || "",
+      checklist: rewrite.checklist || []
+    });
   } catch (error) {
     next(error);
   }

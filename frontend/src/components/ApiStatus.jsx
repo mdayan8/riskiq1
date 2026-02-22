@@ -12,10 +12,12 @@ export default function ApiStatus() {
     let active = true;
     const check = async () => {
       try {
-        const backend = await api.get("/health");
-        const ai = await fetch("http://localhost:8000/health");
+        const { data } = await api.get("/health/system");
         if (active) {
-          setStatus({ backend: backend.data?.status === "ok", ai: ai.ok });
+          setStatus({
+            backend: data?.services?.backend === true,
+            ai: data?.services?.ai === true
+          });
         }
       } catch {
         if (active) setStatus({ backend: false, ai: false });

@@ -59,3 +59,9 @@ class SessionCopilotRequest(BaseModel):
     question: str
     session_context: Dict[str, Any]
     history: List[CopilotMessage] = Field(default_factory=list)
+
+
+class ClauseRewriteRequest(BaseModel):
+    violation: Dict[str, Any]
+    session_context: Dict[str, Any]
+    current_clause: str = ""

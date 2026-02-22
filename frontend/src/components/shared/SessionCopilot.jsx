@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
-import { Bot, MessageSquare, Send } from "lucide-react";
+import { useMemo, useState, useRef, useEffect } from "react";
+import { Bot, MessageSquare, Send, ShieldCheck, Info, CornerDownRight, Zap } from "lucide-react";
 import { api } from "../../lib/api";
+import { cn } from "../../lib/utils";
 
 const QUICK_QUESTIONS = [
   "Why was this document flagged?",
@@ -14,6 +15,13 @@ export default function SessionCopilot({ sessionId }) {
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
 
   const history = useMemo(
     () => messages.map((m) => ({ role: m.role, content: m.content })),
@@ -40,7 +48,8 @@ export default function SessionCopilot({ sessionId }) {
           role: "assistant",
           content: data.answer || "No answer generated.",
           citations: data.citations || [],
-          follow_up: data.follow_up || ""
+          follow_up: data.follow_up || "",
+          evidence_cards: data.evidence_cards || []
         }
       ]);
     } catch (e) {
@@ -51,94 +60,140 @@ export default function SessionCopilot({ sessionId }) {
   };
 
   return (
-    <div className="card p-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold uppercase tracking-widest text-gray-800 inline-flex items-center gap-2">
-          <Bot className="w-4 h-4 text-accent" /> Astra Compliance Copilot
-        </h3>
-        <span className="text-[10px] font-semibold px-2 py-1 rounded bg-blue-50 text-blue-700">Grounded + Cited</span>
+    <div className="card h-[600px] flex flex-col overflow-hidden bg-slate-50/20">
+      <div className="p-4 border-b border-slate-100 bg-white sticky top-0 z-20">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-xs font-black uppercase tracking-widest text-slate-900 inline-flex items-center gap-2">
+            <Zap className="w-4 h-4 text-slate-900 fill-slate-900" /> Astra Compliance Copilot
+          </h3>
+          <span className="text-[10px] font-black px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">GROUNDED</span>
+        </div>
+        <p className="text-[11px] text-slate-500 font-medium">
+          Contextually aware intelligence grounded in this specific document session.
+        </p>
       </div>
 
-      <p className="text-xs text-slate-500">
-        Ask about this session only. Answers are grounded in extracted entities, compliance, risk score, and alerts.
-      </p>
-
-      <div className="flex flex-wrap gap-2">
-        {QUICK_QUESTIONS.map((q) => (
-          <button
-            key={q}
-            type="button"
-            onClick={() => ask(q)}
-            disabled={loading}
-            className="text-[11px] px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50"
-          >
-            {q}
-          </button>
-        ))}
-      </div>
-
-      <div className="space-y-3 max-h-80 overflow-y-auto pr-1 custom-scrollbar">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
         {messages.length === 0 && (
-          <div className="rounded-lg border border-dashed border-slate-200 p-4 text-center">
-            <MessageSquare className="w-5 h-5 text-slate-300 mx-auto mb-2" />
-            <p className="text-xs text-slate-500">No questions yet. Ask a quick question to start.</p>
+          <div className="space-y-4 py-4">
+            <div className="rounded-2xl bg-white border border-slate-100 p-6 text-center shadow-sm">
+              <Bot className="w-8 h-8 text-slate-200 mx-auto mb-3" />
+              <p className="text-sm font-bold text-slate-900">Awaiting your query.</p>
+              <p className="text-xs text-slate-500 mt-1 max-w-[200px] mx-auto">Ask about compliance violations, risk logic, or remediation steps.</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2">
+              {QUICK_QUESTIONS.map((q) => (
+                <button
+                  key={q}
+                  onClick={() => ask(q)}
+                  className="text-left text-[11px] font-bold p-3 rounded-xl border border-slate-100 bg-white hover:border-slate-300 hover:shadow-sm transition-all text-slate-600 flex items-center justify-between group"
+                >
+                  {q}
+                  <CornerDownRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
         {messages.map((m, i) => (
-          <div key={i} className={`rounded-xl p-3 border ${m.role === "user" ? "bg-blue-50 border-blue-100" : "bg-white border-slate-200"}`}>
-            <p className="text-[10px] uppercase tracking-widest font-semibold text-slate-500 mb-1">{m.role === "user" ? "You" : "Copilot"}</p>
-            <p className="text-sm text-slate-800 whitespace-pre-wrap">{m.content}</p>
+          <div key={i} className={cn(
+            "space-y-2 max-w-[90%]",
+            m.role === "user" ? "ml-auto" : "mr-auto"
+          )}>
+            <div className={cn(
+              "rounded-2xl p-4 text-sm leading-relaxed",
+              m.role === "user"
+                ? "bg-slate-900 text-white font-medium"
+                : "bg-white border border-slate-100 text-slate-800 shadow-sm shadow-slate-200/50"
+            )}>
+              {m.content}
+            </div>
 
             {m.role === "assistant" && Array.isArray(m.citations) && m.citations.length > 0 && (
-              <div className="mt-2 space-y-1">
-                <p className="text-[10px] uppercase tracking-widest font-semibold text-slate-500">Evidence Citations</p>
-                {m.citations.slice(0, 6).map((c, idx) => (
-                  <p key={idx} className="text-[11px] text-slate-600">
-                    • <span className="font-semibold">{c.type || "source"}</span> {c.id ? `(${c.id})` : ""}: {c.evidence || "No snippet"}
-                    {c.link && (
-                      <>
-                        {" "}
-                        <a href={c.link} target="_blank" rel="noreferrer" className="text-blue-700 underline">
-                          source link
+              <div className="pl-2 space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-4 mb-2">Evidence Citations</p>
+                <div className="grid grid-cols-1 gap-2">
+                  {m.citations.slice(0, 3).map((c, idx) => (
+                    <div key={idx} className="p-2 bg-white/50 border border-slate-100 rounded-lg">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                        <span className="text-[9px] font-black uppercase text-slate-900">{c.type || "Evidence"}</span>
+                        {c.id && (
+                          <span className="text-[9px] font-semibold text-slate-500">#{c.id}</span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-600 italic line-clamp-2">"{c.evidence || "No snippet"}"</p>
+                      {c.link && (
+                        <a
+                          href={c.link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-block mt-1 text-[10px] font-semibold text-blue-700 hover:text-blue-800 underline"
+                        >
+                          Open source reference
                         </a>
-                      </>
-                    )}
-                  </p>
-                ))}
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
-            {m.role === "assistant" && m.follow_up && (
-              <p className="mt-2 text-[11px] text-blue-700">Suggested next question: {m.follow_up}</p>
+            {m.role === "assistant" && Array.isArray(m.evidence_cards) && m.evidence_cards.length > 0 && (
+              <div className="pl-2 space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-3 mb-1">What is wrong in this document</p>
+                <div className="space-y-1">
+                  {m.evidence_cards
+                    .filter((e) => e.type === "violation")
+                    .slice(0, 4)
+                    .map((e, idx) => (
+                      <div key={`${e.id}-${idx}`} className="rounded-lg border border-rose-100 bg-rose-50/60 px-2 py-1.5">
+                        <p className="text-[10px] font-black text-rose-700 uppercase">{e.id || "Violation"}</p>
+                        <p className="text-[11px] text-rose-900 leading-relaxed">{e.evidence}</p>
+                      </div>
+                    ))}
+                </div>
+              </div>
             )}
           </div>
         ))}
+        {loading && (
+          <div className="bg-white border border-slate-100 rounded-2xl p-4 mr-auto animate-pulse flex items-center gap-2">
+            <div className="flex gap-1">
+              <div className="w-1 h-1 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+              <div className="w-1 h-1 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+              <div className="w-1 h-1 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+            </div>
+          </div>
+        )}
       </div>
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          ask(question);
-        }}
-        className="flex items-center gap-2"
-      >
-        <input
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask this session: why flagged, risk reason, fixes..."
-          className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20"
-        />
-        <button
-          type="submit"
-          disabled={loading || !question.trim()}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-primary text-white px-3 py-2 text-sm font-semibold disabled:opacity-50"
+      <div className="p-4 bg-white border-t border-slate-100">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            ask(question);
+          }}
+          className="relative"
         >
-          <Send className="w-4 h-4" /> {loading ? "Thinking..." : "Ask"}
-        </button>
-      </form>
+          <input
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="Ask session intelligence..."
+            className="w-full bg-slate-50 border-transparent rounded-xl pl-4 pr-12 py-3 text-sm focus:bg-white focus:ring-0 focus:border-slate-200 transition-all font-medium"
+          />
+          <button
+            type="submit"
+            disabled={loading || !question.trim()}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-900 disabled:opacity-30 transition-colors"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </form>
+        {error && <p className="text-[10px] font-bold text-rose-500 mt-2 uppercase tracking-tight">{error}</p>}
+      </div>
     </div>
   );
 }

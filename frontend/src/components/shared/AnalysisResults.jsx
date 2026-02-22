@@ -13,7 +13,8 @@ import {
   PieChart as PieIcon,
   TrendingUp,
   Cpu,
-  ScanSearch
+  ScanSearch,
+  Sparkles
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { cn } from "../../lib/utils";
@@ -28,12 +29,14 @@ const getScoreColor = (score, mappedColor) => {
   return "#ef4444";
 };
 
-export default function AnalysisResults({ result }) {
+export default function AnalysisResults({ result, sessionId = "" }) {
   if (!result) return null;
 
   const extractedData = result.extracted_data || result.structured_data || {};
   const profile = result.document_profile || {};
   const [showAllViolations, setShowAllViolations] = useState(false);
+  const [rewriteLoading, setRewriteLoading] = useState({});
+  const [rewriteResults, setRewriteResults] = useState({});
   const violations = result.compliance?.violations || [];
   const visibleViolations = showAllViolations ? violations : violations.slice(0, 12);
   const severityCounts = useMemo(() => {
@@ -51,6 +54,20 @@ export default function AnalysisResults({ result }) {
     })),
     [result.decision?.rf_feature_contributions]
   );
+  const riskyViolations = useMemo(
+    () => violations.filter((v) => ["HIGH", "MEDIUM"].includes(String(v?.severity || "").toUpperCase())),
+    [violations]
+  );
+  const previewLineToViolation = useMemo(() => {
+    const map = new Map();
+    for (const v of riskyViolations) {
+      const rr = rewriteResults[v.rule_id];
+      if (rr?.line_hint) {
+        map.set(Number(rr.line_hint), v);
+      }
+    }
+    return map;
+  }, [riskyViolations, rewriteResults]);
 
   const downloadReport = async () => {
     const documentRef = result.document_id;
@@ -79,8 +96,49 @@ export default function AnalysisResults({ result }) {
     }
   };
 
+  const resolveCurrentClause = (violation, index = 0) => {
+    const mapped = (result.clause_line_map || [])[index];
+    const fromMap = mapped?.clause;
+    const fromClauses = (result.extracted_data?.clauses || [])[index] || (result.extracted_data?.clauses || [])[0];
+    const fromField = Array.isArray(result.extracted_data?.[violation?.field]) ? result.extracted_data?.[violation?.field]?.[0] : "";
+    return fromMap || fromClauses || fromField || "";
+  };
+
+  const requestRewrite = async (violation, index = 0) => {
+    if (!sessionId || !violation?.rule_id) return;
+    const key = violation.rule_id;
+    setRewriteLoading((m) => ({ ...m, [key]: true }));
+    try {
+      const currentClause = resolveCurrentClause(violation, index);
+      const { data } = await api.post(`/sessions/${sessionId}/rewrite-clause`, {
+        rule_id: key,
+        current_clause: currentClause
+      });
+      setRewriteResults((m) => ({ ...m, [key]: data }));
+    } catch (_e) {
+      setRewriteResults((m) => ({
+        ...m,
+        [key]: {
+          error: "Rewrite generation failed for this rule. Try again."
+        }
+      }));
+    } finally {
+      setRewriteLoading((m) => ({ ...m, [key]: false }));
+    }
+  };
+
+  const generateRewritesForPreview = async () => {
+    if (!sessionId) return;
+    for (let i = 0; i < riskyViolations.length; i += 1) {
+      const v = riskyViolations[i];
+      if (rewriteResults[v.rule_id]?.replacement_clause || rewriteLoading[v.rule_id]) continue;
+      // eslint-disable-next-line no-await-in-loop
+      await requestRewrite(v, i);
+    }
+  };
+
   return (
-    <div className="grid gap-6 grid-cols-1 lg:grid-cols-12 animate-slide-up">
+    <div className="grid gap-10 grid-cols-1 lg:grid-cols-12 animate-slide-up max-w-[1400px] mx-auto">
       <div className="lg:col-span-4 space-y-6">
         <div className="card p-6">
           <div className="mb-4 w-full flex justify-between items-center text-xs font-bold uppercase tracking-widest text-gray-400">
@@ -88,7 +146,7 @@ export default function AnalysisResults({ result }) {
             <PieIcon className="w-4 h-4" />
           </div>
 
-          <div className="relative h-44 w-full">
+          <div className="relative h-56 w-full flex items-center justify-center">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -100,18 +158,19 @@ export default function AnalysisResults({ result }) {
                   cy="100%"
                   startAngle={180}
                   endAngle={0}
-                  innerRadius={56}
-                  outerRadius={74}
+                  innerRadius={70}
+                  outerRadius={90}
                   dataKey="value"
+                  stroke="none"
                 >
                   <Cell fill={getScoreColor(result.decision.score, result.decision.color)} />
-                  <Cell fill="#f1f5f9" />
+                  <Cell fill="#f8fafc" />
                 </Pie>
               </PieChart>
             </ResponsiveContainer>
-            <div className="absolute bottom-0 left-0 w-full text-center">
-              <span className="text-4xl font-black text-gray-900">{(result.decision.score * 100).toFixed(1)}%</span>
-              <p className="text-[10px] uppercase font-bold tracking-tighter text-gray-400 mt-1">Composite Risk Score</p>
+            <div className="absolute bottom-2 left-0 w-full text-center">
+              <span className="text-5xl font-black text-slate-900 tracking-tighter">{(result.decision.score * 100).toFixed(1)}%</span>
+              <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-slate-400 mt-2">Combined Risk Intensity</p>
             </div>
           </div>
 
@@ -232,22 +291,31 @@ export default function AnalysisResults({ result }) {
             <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded">DEEPSEEK-REASONER</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-8">
             {Object.entries(extractedData)
               .filter(([_, val]) => Array.isArray(val) && val.length > 0)
               .map(([key, value]) => (
-                <div key={key} className="p-4 bg-gray-50/50 rounded-xl border border-gray-100 group hover:border-accent/40 transition-all">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 group-hover:text-accent flex items-center gap-1.5">
-                    <ChevronRight className="w-3 h-3" /> {key.replaceAll("_", " ")}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {value.slice(0, 5).map((item, i) => (
-                      <span key={i} className="text-xs bg-white text-gray-800 px-2 py-1 rounded-md border border-gray-100 shadow-sm font-medium">
-                        {String(item)}
-                      </span>
-                    ))}
-                    {value.length > 5 && <span className="text-xs text-gray-400 italic">+{value.length - 5} more</span>}
+                <div key={key} className="p-8 bg-slate-50/50 rounded-2xl border border-slate-100 group hover:border-slate-300 transition-all flex flex-col justify-between gap-6 min-h-[220px]">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400 mb-4 group-hover:text-slate-900 transition-colors">
+                      {key.replaceAll("_", " ")}
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      {value.slice(0, 8).map((item, i) => (
+                        <span key={i} className="text-[11px] bg-white text-slate-900 px-3 py-2 rounded-xl border border-slate-200 shadow-sm font-bold tracking-tight leading-relaxed break-words max-w-full">
+                          {String(item)}
+                        </span>
+                      ))}
+                    </div>
                   </div>
+                  {value.length > 8 && (
+                    <div className="border-t border-slate-100 pt-4 mt-auto">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-200" />
+                        +{value.length - 8} Additional Records
+                      </p>
+                    </div>
+                  )}
                 </div>
               ))}
           </div>
@@ -286,6 +354,36 @@ export default function AnalysisResults({ result }) {
                       <p><span className="font-semibold text-slate-700">Fix:</span> {v.suggestion || "Add explicit compliant clause/data and re-run analysis."}</p>
                     </div>
                   </div>
+                  {sessionId && (
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        onClick={() => requestRewrite(v, i)}
+                        disabled={!!rewriteLoading[v.rule_id]}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-accent" />
+                        {rewriteLoading[v.rule_id] ? "Generating rewrite..." : "Generate compliant rewrite"}
+                      </button>
+                      {rewriteResults[v.rule_id] && (
+                        <div className="mt-2 rounded-lg border border-blue-100 bg-blue-50/40 p-2 space-y-1">
+                          {rewriteResults[v.rule_id].error ? (
+                            <p className="text-[11px] text-red-600">{rewriteResults[v.rule_id].error}</p>
+                          ) : (
+                            <>
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-blue-700">Replace Guidance</p>
+                              <p className="text-[11px] text-slate-700">
+                                Replace around line: <span className="font-semibold">{rewriteResults[v.rule_id].line_hint || "N/A"}</span> ({rewriteResults[v.rule_id].line_match || "no direct match"})
+                              </p>
+                              <p className="text-[11px] text-slate-700"><span className="font-semibold">Current:</span> {rewriteResults[v.rule_id].current_clause || "Not found"}</p>
+                              <p className="text-[11px] text-slate-900"><span className="font-semibold">Suggested replacement:</span> {rewriteResults[v.rule_id].replacement_clause || "No replacement generated"}</p>
+                              <p className="text-[11px] text-slate-700"><span className="font-semibold">Why better:</span> {rewriteResults[v.rule_id].plain_language_explanation || "N/A"}</p>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
               {!violations.length && (
@@ -369,6 +467,67 @@ export default function AnalysisResults({ result }) {
           </div>
           <ShieldCheck className="absolute -bottom-10 -right-10 w-48 h-48 opacity-5 text-white" />
         </div>
+
+        {result.document_preview?.preview_lines?.length > 0 && (
+          <div className="card p-6">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-gray-800">Document Preview (Post Analysis)</h3>
+              {sessionId && riskyViolations.length > 0 && (
+                <button
+                  type="button"
+                  onClick={generateRewritesForPreview}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-accent" />
+                  Generate rewrites for flagged lines
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mb-3">Harmful/non-compliant lines are highlighted. Replacement text appears below when generated.</p>
+            <div className="max-h-72 overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-1">
+              {result.document_preview.preview_lines.map((ln) => {
+                const v = previewLineToViolation.get(Number(ln.line));
+                const rr = v ? rewriteResults[v.rule_id] : null;
+                const tone = v?.severity === "HIGH" ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200";
+                return (
+                  <div key={ln.line} className={cn("rounded border px-2 py-1", v ? tone : "border-transparent")}>
+                    <p className="text-[11px] text-slate-700 font-mono">
+                      <span className="inline-block w-10 text-slate-400">{ln.line}</span> {ln.text}
+                      {v && (
+                        <span className={cn(
+                          "ml-2 text-[9px] px-1.5 py-0.5 rounded uppercase font-bold",
+                          v.severity === "HIGH" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+                        )}>
+                          {v.rule_id}
+                        </span>
+                      )}
+                    </p>
+                    {rr?.replacement_clause && (
+                      <p className="text-[11px] mt-1 text-slate-900">
+                        <span className="font-semibold text-blue-700">Replace with:</span> {rr.replacement_clause}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {!!Object.keys(rewriteResults).length && (
+              <div className="mt-3 space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Rewrite Summary</p>
+                {Object.values(rewriteResults)
+                  .filter((r) => !r?.error && r?.replacement_clause)
+                  .slice(0, 10)
+                  .map((r, idx) => (
+                    <div key={idx} className="rounded-lg border border-blue-100 bg-blue-50/40 p-2">
+                      <p className="text-[11px] text-slate-700">
+                        Line <span className="font-semibold">{r.line_hint || "N/A"}</span> ({r.rule_id}): {r.replacement_clause}
+                      </p>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

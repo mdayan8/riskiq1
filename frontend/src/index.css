@@ -15,9 +15,14 @@
     @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-glass rounded-2xl;
   }
 
-  /* Standard enterprise card */
+  /* Standard enterprise card - Harvey style (Spacious, Clean) */
   .card {
-    @apply bg-white border border-gray-100 shadow-soft rounded-xl transition-shadow hover:shadow-md;
+    @apply bg-white border border-slate-200/60 rounded-2xl transition-all duration-300 hover:border-slate-300;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02), 0 1px 0 rgba(0, 0, 0, 0.02);
+  }
+
+  .card:hover {
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.05);
   }
 
   /* Status Badges */

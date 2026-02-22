@@ -40,3 +40,13 @@ export async function sessionCopilot(payload) {
   const { data } = await client.post("/session-copilot", payload);
   return data;
 }
+
+export async function rewriteClause(payload) {
+  const { data } = await client.post("/rewrite-clause", payload);
+  return data;
+}
+
+export async function aiHealth() {
+  const { data } = await client.get("/health");
+  return data;
+}

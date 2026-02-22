@@ -104,6 +104,7 @@ function AgentPipeline({ stages, currentStage }) {
 
 export default function UploadPage() {
   const [file, setFile] = useState(null);
+  const [filePreview, setFilePreview] = useState({ type: "", text: "", url: "", supported: false, reason: "" });
   const [jobId, setJobId] = useState("");
   const [jobState, setJobState] = useState(null);
   const [result, setResult] = useState(null);
@@ -153,6 +154,47 @@ export default function UploadPage() {
     return () => clearInterval(timer);
   }, [loading]);
 
+  useEffect(() => {
+    if (!file) {
+      setFilePreview({ type: "", text: "", url: "", supported: false, reason: "" });
+      return;
+    }
+    const ext = (file.name.split(".").pop() || "").toLowerCase();
+    const supported = ["pdf", "png", "jpg", "jpeg", "tiff", "bmp", "docx", "txt", "md", "csv", "xlsx"].includes(ext);
+    const maxMb = 25;
+    const tooLarge = file.size > maxMb * 1024 * 1024;
+    const base = {
+      type: ext,
+      text: "",
+      url: "",
+      supported: supported && !tooLarge,
+      reason: !supported ? "Unsupported file type" : tooLarge ? `File too large (> ${maxMb}MB)` : "Valid document format"
+    };
+
+    if (!base.supported) {
+      setFilePreview(base);
+      return;
+    }
+
+    if (["pdf", "png", "jpg", "jpeg", "tiff", "bmp"].includes(ext)) {
+      const url = URL.createObjectURL(file);
+      setFilePreview({ ...base, url });
+      return () => URL.revokeObjectURL(url);
+    }
+
+    if (["txt", "md", "csv"].includes(ext)) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = String(reader.result || "").split("\n").slice(0, 30).join("\n");
+        setFilePreview({ ...base, text });
+      };
+      reader.readAsText(file);
+      return;
+    }
+
+    setFilePreview(base);
+  }, [file]);
+
   const submit = async (e) => {
     e.preventDefault();
     setError("");
@@ -180,19 +222,19 @@ export default function UploadPage() {
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 border-b border-slate-100 pb-10">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-primary">Autonomous Agent Workspace</h2>
-          <p className="text-gray-500 mt-1">Deploying autonomous swarms for multi-framework compliance and risk intelligence.</p>
+          <h2 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">Autonomous <span className="text-slate-400">Workspace</span></h2>
+          <p className="text-lg text-slate-500 mt-4 max-w-2xl font-medium">Deploying autonomous swarms for multi-framework compliance and risk intelligence.</p>
         </div>
         {jobId && (
-          <div className="flex items-center gap-3 bg-white px-3 py-1.5 rounded-full border border-gray-100 shadow-sm">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
+          <div className="flex items-center gap-4 bg-slate-50 px-5 py-3 rounded-2xl border border-slate-200">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-slate-900"></span>
             </span>
-            <span className="text-xs font-medium text-gray-600 uppercase tracking-tighter">Session: {jobId.slice(0, 8)}</span>
-            {loading && <span className="text-xs font-medium text-gray-400">Elapsed: {elapsed}s</span>}
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">Session: {jobId.slice(0, 8)}</span>
+            {loading && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none ml-2">Elapsed: {elapsed}s</span>}
           </div>
         )}
       </div>
@@ -209,6 +251,31 @@ export default function UploadPage() {
                 <h3 className="text-lg font-semibold text-gray-900">{file ? file.name : "Select Financial Document"}</h3>
                 <p className="text-xs text-gray-500 mt-1">{file ? `${(file.size / (1024 * 1024)).toFixed(2)} MB` : "Drag and drop or click to browse files"}</p>
               </div>
+              {file && (
+                <div className={cn(
+                  "w-full max-w-3xl rounded-xl border p-4 bg-white",
+                  filePreview.supported ? "border-emerald-200" : "border-red-200"
+                )}>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-700">Pre-Analysis Document Validation</span>
+                    <span className={cn("px-2 py-0.5 rounded-full font-semibold", filePreview.supported ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700")}>
+                      {filePreview.supported ? "VALID" : "INVALID"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">{filePreview.reason}</p>
+                  <p className="text-xs text-slate-500 mt-1">Type: {(filePreview.type || "unknown").toUpperCase()}</p>
+
+                  {filePreview.url && filePreview.type === "pdf" && (
+                    <iframe title="pdf-preview" src={filePreview.url} className="mt-3 w-full h-56 rounded border border-slate-200" />
+                  )}
+                  {filePreview.url && ["png", "jpg", "jpeg", "tiff", "bmp"].includes(filePreview.type) && (
+                    <img src={filePreview.url} alt="document preview" className="mt-3 w-full max-h-56 object-contain rounded border border-slate-200" />
+                  )}
+                  {filePreview.text && (
+                    <pre className="mt-3 max-h-56 overflow-auto rounded border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-700 whitespace-pre-wrap">{filePreview.text}</pre>
+                  )}
+                </div>
+              )}
               <button disabled={loading} className="mt-4 rounded-xl bg-primary px-8 py-3 text-white font-semibold text-sm hover:bg-black transition-all shadow-lg active:scale-95 disabled:opacity-50">
                 {loading ? "RUNNING AGENT WORKFLOW..." : "INITIATE PIPELINE"}
               </button>
@@ -254,7 +321,7 @@ export default function UploadPage() {
         </div>
       )}
 
-      {result && <AnalysisResults result={result} />}
+      {result && <AnalysisResults result={result} sessionId={jobId || ""} />}
     </div>
   );
 }

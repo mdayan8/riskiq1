@@ -87,6 +87,59 @@ DOC_TYPE_RULE_FIELDS = {
     },
 }
 
+def _build_document_preview(text: str, max_lines: int = 80) -> Dict[str, Any]:
+    lines = [ln.rstrip() for ln in text.splitlines() if ln.strip()]
+    preview_lines = lines[:max_lines]
+    return {
+        "line_count": len(lines),
+        "preview_lines": [
+            {"line": idx + 1, "text": ln}
+            for idx, ln in enumerate(preview_lines)
+        ],
+    }
+
+
+def _find_clause_line(lines: List[str], clause: str) -> Dict[str, Any]:
+    needle = (clause or "").strip().lower()
+    if not needle:
+        return {"line": None, "match": "none"}
+
+    # Exact/substring pass first
+    for idx, line in enumerate(lines, start=1):
+        text = line.lower()
+        if needle in text or text in needle:
+            return {"line": idx, "match": "exact_or_substring"}
+
+    # Fallback fuzzy-ish token overlap
+    needle_tokens = [t for t in needle.split() if len(t) > 3][:8]
+    if not needle_tokens:
+        return {"line": None, "match": "none"}
+    best = (0, None)
+    for idx, line in enumerate(lines, start=1):
+        l = line.lower()
+        score = sum(1 for t in needle_tokens if t in l)
+        if score > best[0]:
+            best = (score, idx)
+    if best[1] and best[0] >= max(2, len(needle_tokens) // 2):
+        return {"line": best[1], "match": "token_overlap"}
+    return {"line": None, "match": "none"}
+
+
+def _build_clause_line_map(text: str, clauses: List[Any]) -> List[Dict[str, Any]]:
+    lines = [ln.rstrip() for ln in text.splitlines() if ln.strip()]
+    mappings: List[Dict[str, Any]] = []
+    for clause in (clauses or [])[:24]:
+        clause_text = str(clause)
+        found = _find_clause_line(lines, clause_text)
+        mappings.append(
+            {
+                "clause": clause_text,
+                "line": found["line"],
+                "match": found["match"],
+            }
+        )
+    return mappings
+
 
 def _prompt_map(agent_prompts: List[Dict[str, Any]]) -> Dict[str, str]:
     prompts = dict(DEFAULT_AGENT_PROMPTS)
@@ -358,6 +411,8 @@ def orchestrate_agents(
     # Reporting Agent (local executive summary)
     reporting_summary = _reporting_summary(file_name, compliance, decision, alerts)
     suggestions = _suggestions(compliance, decision, normalized, knowledge_base)
+    document_preview = _build_document_preview(text)
+    clause_line_map = _build_clause_line_map(text, normalized.get("clauses", []))
 
     timestamp = datetime.utcnow().isoformat()
     agent_trace = [
@@ -422,6 +477,8 @@ def orchestrate_agents(
         "monitoring_summary": monitoring_summary,
         "reporting_summary": reporting_summary,
         "suggestions": suggestions,
+        "document_preview": document_preview,
+        "clause_line_map": clause_line_map,
         "models_used": [
             {"component": "Document Intelligence", "model": "deepseek-reasoner", "provider": "DeepSeek"},
             {"component": "Document Type Detection", "model": "deepseek-reasoner", "provider": "DeepSeek"},

@@ -16,10 +16,28 @@ import {
 } from "recharts";
 import {
   FileText, ShieldAlert, History, Activity, TrendingUp, AlertTriangle,
-  ChevronRight, ArrowUpRight, Bell, Zap, Database
+  ChevronRight, ArrowUpRight, Bell, Zap, Database, Search, UserCheck, Inbox
 } from "lucide-react";
 import { api } from "../lib/api";
 import { cn } from "../lib/utils";
+
+const Sparkline = ({ data, color }) => (
+  <div className="h-10 w-24">
+    <ResponsiveContainer width="100%" height="100%">
+      <AreaChart data={data}>
+        <Area
+          type="monotone"
+          dataKey="v"
+          stroke={color}
+          fill={color}
+          fillOpacity={0.1}
+          strokeWidth={2}
+          isAnimationActive={false}
+        />
+      </AreaChart>
+    </ResponsiveContainer>
+  </div>
+);
 
 export default function DashboardPage() {
   const [data, setData] = useState(null);
@@ -33,12 +51,11 @@ export default function DashboardPage() {
     try {
       const [d, s] = await Promise.all([api.get("/dashboard"), api.get("/sessions")]);
       setData(d.data);
-      const sessionList = (s.data.sessions || []).slice(0, 8);
+      const sessionList = (s.data.sessions || []).slice(0, 5);
       setSessions(sessionList);
 
       const alertTotal = d.data.alerts_by_severity.reduce((acc, item) => acc + Number(item.total), 0);
 
-      // Real-time Alert Popup Logic
       if (lastAlertCount > 0 && alertTotal > lastAlertCount) {
         setNewAlert({
           message: `New High-Severity Alert Detected`,
@@ -55,7 +72,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchTelemetry();
-    pollTimer.current = setInterval(fetchTelemetry, 3000); // Reactive Telemetry
+    pollTimer.current = setInterval(fetchTelemetry, 3000);
     return () => clearInterval(pollTimer.current);
   }, [lastAlertCount]);
 
@@ -68,228 +85,224 @@ export default function DashboardPage() {
   );
 
   const alertTotal = data.alerts_by_severity.reduce((acc, item) => acc + Number(item.total), 0);
-  const complianceBuckets = data.compliance_distribution.length;
+
+  // Mock sparklines based on trend data
+  const docSpark = data.score_trend.slice(-10).map((v, i) => ({ v: v.avg_score + Math.random() * 0.1 }));
+  const riskSpark = data.fraud_trend?.slice(-10).map((v, i) => ({ v: v.avg_fraud_score + Math.random() * 0.1 })) || [];
 
   return (
-    <div className="space-y-8 animate-slide-up pb-10">
-      {/* Real-time Alert Notification */}
-      {newAlert && (
-        <div className="fixed top-20 right-8 z-50 animate-slide-up">
-          <div className="bg-error text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border border-white/20 backdrop-blur-md">
-            <div className="bg-white/20 p-2 rounded-lg">
-              <Bell className="w-5 h-5 animate-bounce" />
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-tighter opacity-80">Live Security Event</p>
-              <p className="text-sm font-bold">{newAlert.message}</p>
-            </div>
-            <p className="text-[10px] ml-4 font-mono opacity-60">{newAlert.time}</p>
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <div className="max-w-[1600px] mx-auto space-y-12 animate-slide-up pb-20 pt-4">
+      {/* Premium Studio Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 border-b border-slate-100 pb-10">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-primary">System Command Center</h2>
-          <p className="text-gray-500 mt-1 flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
-            </span>
-            Real-time pipeline telemetry from autonomous AI swarms.
+          <div className="flex items-center gap-2 mb-3">
+            <span className="bg-slate-900 text-white text-[10px] font-bold px-2 py-0.5 rounded tracking-widest uppercase">Enterprise</span>
+            <span className="text-slate-400 text-[10px] font-bold tracking-widest uppercase">v2.4.0-Stable</span>
+          </div>
+          <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">
+            Command <span className="text-slate-400">Intelligence</span>
+          </h1>
+          <p className="text-lg text-slate-500 mt-3 max-w-2xl font-medium">
+            Autonomous risk orchestration and real-time inference telemetry across global data swarms.
           </p>
         </div>
-        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
-          <Database className="w-4 h-4 text-accent" />
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Storage Level: 1.2TB / 5TB</span>
+        <div className="flex items-center gap-6">
+          <div className="text-right hidden sm:block">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">System Health</p>
+            <p className="text-sm font-bold text-slate-900">99.98% Operational</p>
+          </div>
+          <div className="h-12 w-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center shadow-sm">
+            <Activity className="w-6 h-6 text-slate-900" />
+          </div>
         </div>
       </div>
 
-      {/* Interactive Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Link to="/sessions" className="group">
-          <div className="card p-6 hover:border-accent/40 hover:shadow-lg transition-all relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/50 rounded-full -mr-12 -mt-12 group-hover:scale-110 transition-transform" />
-            <div className="flex justify-between items-start mb-4 relative z-10">
-              <div className="p-2 bg-blue-50 rounded-xl">
-                <FileText className="w-5 h-5 text-accent" />
-              </div>
-              <ArrowUpRight className="w-4 h-4 text-gray-300 group-hover:text-accent transition-colors" />
+      {/* Harvey Style Insight Shelves */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="card p-8 group relative overflow-hidden flex flex-col justify-between min-h-[220px]">
+          <div className="flex justify-between items-start relative z-10">
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">Global Extraction</p>
+              <h3 className="text-5xl font-black text-slate-900 tracking-tighter">{data.total_documents_analyzed}</h3>
             </div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest relative z-10">Documents</p>
-            <p className="text-3xl font-black text-gray-900 mt-1 relative z-10">{data.total_documents_analyzed}</p>
+            <Sparkline data={docSpark} color="#2E6CF6" />
           </div>
-        </Link>
+          <div className="mt-8 flex items-center justify-between relative z-10">
+            <p className="text-xs font-semibold text-slate-500">Documents scrutinized by AI swarm</p>
+            <Link to="/sessions" className="text-slate-900 hover:translate-x-1 transition-transform">
+              <ArrowUpRight className="w-5 h-5" />
+            </Link>
+          </div>
+          <div className="absolute bottom-0 right-0 w-32 h-32 bg-slate-50/50 rounded-full mix-blend-multiply filter blur-3xl opacity-50 -mr-16 -mb-16" />
+        </div>
 
-        <Link to="/alerts" className="group">
-          <div className="card p-6 hover:border-error/40 hover:shadow-lg transition-all relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-error-light/10 rounded-full -mr-12 -mt-12 group-hover:scale-110 transition-transform" />
-            <div className="flex justify-between items-start mb-4 relative z-10">
-              <div className="p-2 bg-error-light/30 rounded-xl">
-                <ShieldAlert className="w-5 h-5 text-error" />
-              </div>
-              <ArrowUpRight className="w-4 h-4 text-gray-300 group-hover:text-error transition-colors" />
+        <div className="card p-8 group relative overflow-hidden flex flex-col justify-between min-h-[220px]">
+          <div className="flex justify-between items-start relative z-10">
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">Risk Signals</p>
+              <h3 className="text-5xl font-black text-rose-600 tracking-tighter">{alertTotal}</h3>
             </div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest relative z-10">Risk Alerts</p>
-            <p className="text-3xl font-black text-gray-900 mt-1 relative z-10">{alertTotal}</p>
+            <Sparkline data={riskSpark} color="#E11D48" />
           </div>
-        </Link>
+          <div className="mt-8 flex items-center justify-between relative z-10">
+            <p className="text-xs font-semibold text-slate-500">Anomalies requiring human oversight</p>
+            <Link to="/alerts" className="text-slate-900 hover:translate-x-1 transition-transform">
+              <ArrowUpRight className="w-5 h-5" />
+            </Link>
+          </div>
+          <div className="absolute bottom-0 right-0 w-32 h-32 bg-rose-50/50 rounded-full mix-blend-multiply filter blur-3xl opacity-50 -mr-16 -mb-16" />
+        </div>
 
-        <Link to="/reports" className="group">
-          <div className="card p-6 hover:border-success/40 hover:shadow-lg transition-all relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-50/50 rounded-full -mr-12 -mt-12 group-hover:scale-110 transition-transform" />
-            <div className="flex justify-between items-start mb-4 relative z-10">
-              <div className="p-2 bg-emerald-50 rounded-xl">
-                <Activity className="w-5 h-5 text-success" />
-              </div>
-              <ArrowUpRight className="w-4 h-4 text-gray-300 group-hover:text-success transition-colors" />
+        <div className="card p-8 group relative overflow-hidden flex flex-col justify-between min-h-[220px]">
+          <div className="flex justify-between items-start relative z-10">
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">Compliant Footprint</p>
+              <h3 className="text-5xl font-black text-emerald-600 tracking-tighter">{Math.round((data.compliance_distribution.find(i => i.status === 'PASS')?.total / (alertTotal || 1)) * 100)}%</h3>
             </div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest relative z-10">Compliant Hubs</p>
-            <p className="text-3xl font-black text-gray-900 mt-1 relative z-10">{complianceBuckets}</p>
-          </div>
-        </Link>
-
-        <Link to="/sessions" className="group">
-          <div className="card p-6 hover:border-accent/40 hover:shadow-lg transition-all relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-slate-50 rounded-full -mr-12 -mt-12 group-hover:scale-110 transition-transform" />
-            <div className="flex justify-between items-start mb-4 relative z-10">
-              <div className="p-2 bg-slate-100 rounded-xl">
-                <History className="w-5 h-5 text-slate-600" />
-              </div>
-              <ArrowUpRight className="w-4 h-4 text-gray-300 group-hover:text-accent transition-colors" />
+            <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-100">
+              <ShieldAlert className="w-8 h-8 text-emerald-600" />
             </div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest relative z-10">Active Sessions</p>
-            <p className="text-3xl font-black text-gray-900 mt-1 relative z-10">{sessions.length}</p>
           </div>
-        </Link>
+          <div className="mt-8 flex items-center justify-between relative z-10">
+            <p className="text-xs font-semibold text-slate-500">Average alignment with GVR/RBI</p>
+            <Link to="/reports" className="text-slate-900 hover:translate-x-1 transition-transform">
+              <ArrowUpRight className="w-5 h-5" />
+            </Link>
+          </div>
+          <div className="absolute bottom-0 right-0 w-32 h-32 bg-emerald-50/50 rounded-full mix-blend-multiply filter blur-3xl opacity-50 -mr-16 -mb-16" />
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: Charts */}
-        <div className="lg:col-span-8 space-y-6">
-          <div className="card p-8 group">
-            <div className="flex items-center justify-between mb-8">
+      {/* Full-Width Analytics Section */}
+      <div className="space-y-8">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Decision Engineering</h2>
+          <div className="flex gap-2">
+            <div className="px-3 py-1 bg-slate-50 border border-slate-100 rounded-lg text-[10px] font-bold text-slate-500 uppercase tracking-widest">7 Day Pulse</div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          <div className="card p-10">
+            <div className="flex items-center justify-between mb-10">
               <div>
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-accent" /> Decision Intelligence Trend
-                </h3>
-                <p className="text-xs text-gray-500 mt-1 uppercase font-bold tracking-tighter">Aggregated agent scoring history</p>
-              </div>
-              <div className="flex gap-2">
-                <span className="bg-success/10 text-success text-[10px] font-bold px-2 py-1 rounded">STABLE</span>
+                <h3 className="text-lg font-bold text-slate-900">Intelligence Confidence Trend</h3>
+                <p className="text-sm text-slate-500 mt-1">Weighted average of agent output stability.</p>
               </div>
             </div>
-            <div className="h-[280px]">
+            <div className="h-[340px]">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={data.score_trend}>
                   <defs>
                     <linearGradient id="scoreColor" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#2E6CF6" stopOpacity={0.15} />
+                      <stop offset="95%" stopColor="#2E6CF6" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} domain={[0, 1]} />
+                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} dx={-10} domain={[0, 1]} />
                   <Tooltip
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                    itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1)', padding: '12px 16px' }}
+                    itemStyle={{ fontSize: '13px', fontWeight: '800', color: '#0f172a' }}
                   />
-                  <Area type="monotone" dataKey="avg_score" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#scoreColor)" />
+                  <Area type="monotone" dataKey="avg_score" stroke="#2E6CF6" strokeWidth={4} fillOpacity={1} fill="url(#scoreColor)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          <div className="card p-8 overflow-hidden relative">
-            <div className="flex items-center justify-between mb-8">
+          <div className="card p-10">
+            <div className="flex items-center justify-between mb-10">
               <div>
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-error" /> Fraud Probability (RF Engine)
-                </h3>
-                <p className="text-xs text-gray-500 mt-1 uppercase font-bold tracking-tighter">Real-time model inference telemetry</p>
+                <h3 className="text-lg font-bold text-slate-900">Fraud Probability Inference</h3>
+                <p className="text-sm text-slate-500 mt-1">Real-time model output from RandomForest engine.</p>
               </div>
             </div>
-            <div className="h-[240px]">
+            <div className="h-[340px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data.fraud_trend || []}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} domain={[0, 1]} />
+                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} dx={-10} domain={[0, 1]} />
                   <Tooltip
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1)', padding: '12px 16px' }}
                   />
                   <Line
                     type="stepAfter"
                     dataKey="avg_fraud_score"
-                    stroke="#ef4444"
-                    strokeWidth={3}
+                    stroke="#E11D48"
+                    strokeWidth={4}
                     dot={false}
-                    activeDot={{ r: 6, fill: '#ef4444', strokeWidth: 0 }}
+                    activeDot={{ r: 8, fill: '#E11D48', strokeWidth: 0 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Right: Lists & Distro */}
-        <div className="lg:col-span-4 space-y-6">
-          <div className="card p-6">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
-              <Zap className="w-4 h-4 text-accent" /> Compliance Distribution
-            </h3>
-            <div className="h-[180px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.compliance_distribution} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                  <XAxis type="number" hide />
-                  <YAxis dataKey="status" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold' }} width={60} />
-                  <Tooltip cursor={{ fill: 'transparent' }} />
-                  <Bar dataKey="total" radius={[0, 4, 4, 0]} barSize={24}>
-                    {data.compliance_distribution.map((entry, index) => (
-                      <Cell key={index} fill={entry.status === 'PASS' ? '#10b981' : '#ef4444'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+      {/* Ledger Style Activity Stream */}
+      <div className="space-y-8">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Recent Intelligence Sessions</h2>
+          <Link to="/sessions" className="text-sm font-bold text-slate-900 border-b-2 border-slate-900 pb-0.5 hover:text-slate-500 hover:border-slate-500 transition-all">VIEW FULL ARCHIVE</Link>
+        </div>
 
-          <div className="card p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400">Activity Stream</h3>
-              <Link to="/sessions" className="text-[10px] font-bold text-accent px-2 py-1 bg-blue-50 rounded-lg hover:bg-accent hover:text-white transition-all">VIEW ALL</Link>
-            </div>
-            <div className="space-y-4">
-              {sessions.map((s) => (
-                <Link to={`/sessions`} key={s.id} className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-xl transition-all border border-transparent hover:border-gray-100 group">
-                  <div className={cn(
-                    "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
-                    s.status === "completed" ? "bg-emerald-50 text-emerald-600" :
-                      s.status === "failed" ? "bg-error-light/50 text-error" :
-                        "bg-blue-50 text-accent animate-pulse"
-                  )}>
-                    {s.status === "completed" ? <ShieldAlert className="w-5 h-5" /> :
-                      s.status === "failed" ? <AlertTriangle className="w-5 h-5" /> :
-                        <Activity className="w-5 h-5" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-gray-900 truncate group-hover:text-accent transition-colors">{s.file_name.split('/').pop()}</p>
-                    <p className="text-[10px] uppercase font-bold tracking-tighter text-gray-400 mt-0.5">
-                      {s.status} • {s.current_stage || "VALIDATED"}
-                    </p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-900" />
-                </Link>
-              ))}
-              {sessions.length === 0 && (
-                <div className="text-center py-10">
-                  <FileText className="w-12 h-12 text-gray-100 mx-auto mb-2" />
-                  <p className="text-xs font-bold text-gray-300 uppercase tracking-widest">No active sessions</p>
-                </div>
-              )}
-            </div>
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-100">
+                  <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Document Session</th>
+                  <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Agent Status</th>
+                  <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Risk Tier</th>
+                  <th className="px-8 py-5 text-[100px] font-bold text-slate-400 uppercase tracking-widest text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {sessions.map((s) => (
+                  <tr key={s.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center group-hover:bg-white border border-transparent group-hover:border-slate-200 transition-all">
+                          <FileText className="w-5 h-5 text-slate-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-900 tracking-tight">{s.file_name.split('/').pop()}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">ID: {s.id.slice(0, 8)}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          "w-2 h-2 rounded-full",
+                          s.status === "completed" ? "bg-emerald-500" :
+                            s.status === "failed" ? "bg-rose-500" : "bg-blue-500 animate-pulse"
+                        )} />
+                        <span className="text-xs font-bold text-slate-700 uppercase">{s.status}</span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-6">
+                      <span className={cn(
+                        "text-[10px] font-black px-2 py-1 rounded tracking-tighter uppercase",
+                        s.status === "completed" ? "bg-emerald-100 text-emerald-800" :
+                          s.status === "failed" ? "bg-rose-100 text-rose-800" : "bg-slate-100 text-slate-500"
+                      )}>
+                        {s.status === "completed" ? "Verified Safe" : "Action Required"}
+                      </span>
+                    </td>
+                    <td className="px-8 py-6 text-right">
+                      <Link to="/sessions" className="inline-flex items-center gap-2 text-xs font-bold text-slate-900 hover:text-blue-600 transition-colors">
+                        Inspect <ArrowUpRight className="w-4 h-4" />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

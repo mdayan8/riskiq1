@@ -1,7 +1,7 @@
 from fastapi import APIRouter
-from app.models.schemas import AnalyzeRequest, ComplianceRequest, DecisionRequest, ReportRequest, OrchestrateRequest, CombinedReportRequest, SessionCopilotRequest
+from app.models.schemas import AnalyzeRequest, ComplianceRequest, DecisionRequest, ReportRequest, OrchestrateRequest, CombinedReportRequest, SessionCopilotRequest, ClauseRewriteRequest
 from app.services.extract_service import extract_document_text, normalize_output
-from app.services.deepseek_service import extract_structured_data, session_copilot
+from app.services.deepseek_service import extract_structured_data, session_copilot, rewrite_clause
 from app.services.rules_loader import load_rules
 from app.services.compliance_service import validate_rules
 from app.services.decision_service import score_decision
@@ -98,3 +98,19 @@ def scrape_reference(payload: dict):
     if not url:
         return {"error": "Missing url"}
     return scrape_reference_url(url)
+
+
+@router.post("/rewrite-clause")
+def clause_rewrite(payload: ClauseRewriteRequest):
+    parsed, raw = rewrite_clause(
+        violation=payload.violation,
+        session_context=payload.session_context,
+        current_clause=payload.current_clause,
+    )
+    return {
+        "replacement_clause": parsed.get("replacement_clause", ""),
+        "plain_language_explanation": parsed.get("plain_language_explanation", ""),
+        "risk_reduction_summary": parsed.get("risk_reduction_summary", ""),
+        "checklist": parsed.get("checklist", []),
+        "raw": raw,
+    }

@@ -32,7 +32,7 @@ Persona:
 Mission:
 - Help user understand exactly why a session is LOW/MEDIUM/HIGH risk.
 - Highlight what to fix first and what evidence supports the conclusion.
-Answer ONLY from provided session_context facts. Do not invent facts.
+Answer ONLY from provided session_context facts and evidence_cards. Do not invent facts.
 Return strict JSON only with this shape:
 {
   "answer": "<clear concise answer>",
@@ -52,7 +52,29 @@ Rules:
 - Keep answer practical for compliance analysts.
 - Keep answer short-first (2-5 lines), then add bullets if needed.
 - When citing standards or references, include the real URL in `link`.
+- Prefer citations from `evidence_cards` ids.
+- If question asks "what is wrong", reference exact violation ids and line evidence when available.
+- If user input is greeting/small-talk (e.g. hi/hello/hlo), do NOT output risk analysis. Reply with a short greeting and ask what they want to inspect.
+- If question intent is unclear, ask one clarifying follow-up and avoid generic template text.
+- Do not repeat the same sentence structure across turns; adapt to the user's exact question.
 No markdown.
+""".strip()
+
+CLAUSE_REWRITE_PROMPT = """
+You are Lexa Rewrite Agent for RiskIQ.
+Task:
+- Rewrite a non-compliant or weak financial clause into a stronger, compliant version.
+- Keep legal tone concise and institution-ready.
+Return strict JSON:
+{
+  "replacement_clause": "<final text to replace with>",
+  "plain_language_explanation": "<why this is better>",
+  "risk_reduction_summary": "<what risk/compliance gap is reduced>",
+  "checklist": ["<verification step 1>", "<step 2>", "<step 3>"]
+}
+Rules:
+- Use only provided context and violation details.
+- Do not output markdown.
 """.strip()
 
 class DeepSeekError(RuntimeError):
@@ -152,6 +174,7 @@ def session_copilot(question: str, session_context: dict, history: list[dict] | 
         "alerts": (session_context.get("alerts", []))[:12],
         "extracted_entities": session_context.get("extracted_entities", {}),
         "standard_references": (session_context.get("standard_references", []))[:8],
+        "evidence_cards": (session_context.get("evidence_cards", []))[:12],
     }
     return chat_completion(
         system_prompt=SESSION_COPILOT_PROMPT,
@@ -164,7 +187,30 @@ def session_copilot(question: str, session_context: dict, history: list[dict] | 
             + question
         ),
         expect_json=True,
-        temperature=0,
+        temperature=0.15,
         model="deepseek-chat",
         timeout_sec=40,
+    )
+
+
+def rewrite_clause(violation: dict, session_context: dict, current_clause: str = ""):
+    compact_context = {
+        "violation": violation,
+        "current_clause": current_clause,
+        "document_type": (session_context.get("document_profile") or {}).get("document_type"),
+        "risk_category": (session_context.get("decision") or {}).get("risk_category"),
+        "top_entities": {
+            "names": (session_context.get("extracted_entities") or {}).get("names", [])[:5],
+            "amounts": (session_context.get("extracted_entities") or {}).get("amounts", [])[:5],
+            "dates": (session_context.get("extracted_entities") or {}).get("dates", [])[:5],
+        },
+        "references": (session_context.get("standard_references") or [])[:6],
+    }
+    return chat_completion(
+        system_prompt=CLAUSE_REWRITE_PROMPT,
+        user_prompt="Rewrite request context:\n" + json.dumps(compact_context, ensure_ascii=False),
+        expect_json=True,
+        temperature=0,
+        model="deepseek-chat",
+        timeout_sec=45,
     )
