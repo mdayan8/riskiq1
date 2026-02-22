@@ -72,4 +72,5 @@ def combined_report(payload: CombinedReportRequest):
         package_name=payload.package_name,
         regulator=payload.regulator,
         submissions=payload.submissions,
+        analysis_summary=payload.analysis_summary,
     )

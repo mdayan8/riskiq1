@@ -3,6 +3,26 @@ import { Play, PlusCircle, Send, FileText, CheckCircle2 } from "lucide-react";
 import { api } from "../lib/api";
 import { cn } from "../lib/utils";
 
+function verdictTone(verdict) {
+  if (verdict === "READY_WITH_STANDARD_REVIEW") return "text-emerald-700 bg-emerald-50 border-emerald-200";
+  if (verdict === "CONDITIONAL_READY_REQUIRES_REMEDIATION") return "text-amber-700 bg-amber-50 border-amber-200";
+  if (verdict === "NOT_READY_REQUIRES_MAJOR_REMEDIATION") return "text-red-700 bg-red-50 border-red-200";
+  return "text-slate-700 bg-slate-50 border-slate-200";
+}
+
+function parseAnalysis(input) {
+  if (!input) return null;
+  if (typeof input === "object") return input;
+  if (typeof input === "string") {
+    try {
+      return JSON.parse(input);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 export default function SubmissionSimulationPage() {
   const [sessions, setSessions] = useState([]);
   const [simulations, setSimulations] = useState([]);
@@ -147,7 +167,9 @@ export default function SubmissionSimulationPage() {
         <div className="card p-5 space-y-4">
           <h3 className="text-sm font-bold uppercase tracking-widest text-gray-700">Simulation Queue</h3>
           <div className="space-y-3">
-            {simulations.map((sim) => (
+            {simulations.map((sim) => {
+              const analysis = parseAnalysis(sim.analysis_json);
+              return (
               <div key={sim.id} className="rounded-xl border border-gray-100 bg-gray-50/40 p-4">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -173,6 +195,49 @@ export default function SubmissionSimulationPage() {
                     )}
                   </div>
                 </div>
+                {analysis && (
+                  <div className="mt-3 space-y-3">
+                    <div className={cn("rounded-lg border px-3 py-2 text-xs font-semibold", verdictTone(analysis.verdict))}>
+                      {analysis.headline || "Simulation analysis generated."}
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-4">
+                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-widest text-slate-500">Readiness</p>
+                        <p className="text-sm font-bold text-slate-900">{analysis.readiness_index ?? "NA"}/100</p>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-widest text-slate-500">Avg Score</p>
+                        <p className="text-sm font-bold text-slate-900">{analysis.average_score_pct ?? "NA"}%</p>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-widest text-slate-500">Avg Confidence</p>
+                        <p className="text-sm font-bold text-slate-900">{analysis.average_confidence_pct ?? "NA"}%</p>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-widest text-slate-500">Violations</p>
+                        <p className="text-sm font-bold text-slate-900">{analysis.total_violations ?? "NA"}</p>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                      <p className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold mb-2">Easy Read Analysis</p>
+                      <div className="space-y-1">
+                        {(analysis.easy_read_points || []).map((point, idx) => (
+                          <p key={idx} className="text-xs text-slate-700">• {point}</p>
+                        ))}
+                      </div>
+                    </div>
+                    {!!analysis.top_rule_breaches?.length && (
+                      <div className="rounded-lg border border-slate-100 bg-white p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold mb-2">Top Rule Breaches</p>
+                        <div className="grid gap-1 md:grid-cols-2">
+                          {analysis.top_rule_breaches.slice(0, 6).map((b) => (
+                            <p key={b.rule_id} className="text-xs text-slate-700">{b.rule_id}: {b.count}</p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="mt-3 space-y-1">
                   {(sim.timeline_json || []).slice(-4).map((t, i) => (
                     <p key={i} className="text-[11px] text-gray-600 inline-flex items-center gap-2 mr-3">
@@ -181,7 +246,7 @@ export default function SubmissionSimulationPage() {
                   ))}
                 </div>
               </div>
-            ))}
+            )})}
             {simulations.length === 0 && <p className="text-sm text-gray-500">No simulations staged yet.</p>}
           </div>
         </div>

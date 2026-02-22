@@ -224,11 +224,12 @@ def generate_report(
     return {"report_path": f"reports/generated/{file_name}"}
 
 
-def generate_combined_report(package_name, regulator, submissions):
+def generate_combined_report(package_name, regulator, submissions, analysis_summary=None):
     os.makedirs(REPORTS_DIR, exist_ok=True)
     safe_name = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in package_name.strip())[:64] or "submission"
     file_name = f"combined-{safe_name}-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.pdf"
     full_path = os.path.join(REPORTS_DIR, file_name)
+    analysis_summary = analysis_summary or {}
 
     c = canvas.Canvas(full_path, pagesize=A4)
     _draw_header(c, f"{regulator} Submission Package - {package_name}")
@@ -239,6 +240,42 @@ def generate_combined_report(package_name, regulator, submissions):
     y = _paragraph(c, MARGIN_X, y, f"Package Name: {package_name}", CONTENT_W)
     y = _paragraph(c, MARGIN_X, y, f"Included Sessions: {len(submissions)}", CONTENT_W)
     y -= 8
+
+    y = _section_title(c, y, "Executive Simulation Analysis")
+    readiness = analysis_summary.get("readiness_index", "NA")
+    verdict = analysis_summary.get("verdict", "NA")
+    y = _paragraph(c, MARGIN_X, y, f"Readiness Index: {readiness}/100", CONTENT_W)
+    y = _paragraph(c, MARGIN_X, y, f"Verdict: {verdict}", CONTENT_W)
+    y = _paragraph(c, MARGIN_X, y, analysis_summary.get("headline", "No summary headline generated."), CONTENT_W)
+    for point in (analysis_summary.get("easy_read_points") or [])[:4]:
+        y = _paragraph(c, MARGIN_X + 10, y, f"- {point}", CONTENT_W - 10)
+    y -= 8
+
+    mix = analysis_summary.get("risk_mix") or {}
+    y = _section_title(c, y, "Risk Mix & Key Metrics")
+    y = _paragraph(
+        c,
+        MARGIN_X,
+        y,
+        f"Risk Mix -> HIGH: {mix.get('HIGH', 0)}, MEDIUM: {mix.get('MEDIUM', 0)}, LOW: {mix.get('LOW', 0)}",
+        CONTENT_W,
+    )
+    y = _paragraph(
+        c,
+        MARGIN_X,
+        y,
+        f"Average Score: {analysis_summary.get('average_score_pct', 'NA')}% | Average Confidence: {analysis_summary.get('average_confidence_pct', 'NA')}% | Total Violations: {analysis_summary.get('total_violations', 'NA')}",
+        CONTENT_W,
+    )
+    y -= 8
+
+    top_breaches = analysis_summary.get("top_rule_breaches") or []
+    if top_breaches:
+        y = _section_title(c, y, "Most Frequent Breaches")
+        for breach in top_breaches[:6]:
+            y = _ensure_space(c, y, 20, f"{regulator} Submission Package - {package_name}")
+            y = _paragraph(c, MARGIN_X + 8, y, f"- {breach.get('rule_id', 'UNKNOWN')}: {breach.get('count', 0)} occurrence(s)", CONTENT_W - 8, size=8, leading=11)
+        y -= 6
 
     y = _section_title(c, y, "Included Reports")
     for i, item in enumerate(submissions, start=1):
@@ -252,7 +289,7 @@ def generate_combined_report(package_name, regulator, submissions):
         c.setFont("Helvetica", 8)
         c.setFillColorRGB(0.30, 0.36, 0.44)
         c.drawString(MARGIN_X + 10, y - 31, f"Document Ref: {item.get('document_ref', 'NA')}")
-        c.drawString(MARGIN_X + 10, y - 43, f"Risk: {item.get('risk_category', 'NA')} | Score: {item.get('score', 'NA')} | Violations: {item.get('violations', 'NA')}")
+        c.drawString(MARGIN_X + 10, y - 43, f"Risk: {item.get('risk_category', 'NA')} | Score: {item.get('score', 'NA')} | Confidence: {item.get('confidence', 'NA')} | Violations: {item.get('violations', 'NA')}")
         y -= 62
 
     c.setFont("Helvetica", 8)

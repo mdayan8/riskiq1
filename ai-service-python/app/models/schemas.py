@@ -47,3 +47,4 @@ class CombinedReportRequest(BaseModel):
     package_name: str
     regulator: str = "RBI"
     submissions: List[Dict[str, Any]] = Field(default_factory=list)
+    analysis_summary: Dict[str, Any] = Field(default_factory=dict)

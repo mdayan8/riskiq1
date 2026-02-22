@@ -20,6 +20,82 @@ import {
 
 const router = express.Router();
 
+function summarizeSimulation(submissionRows, sessions) {
+  const scoreValues = submissionRows
+    .map((s) => Number(s.score))
+    .filter((v) => Number.isFinite(v));
+  const confidenceValues = submissionRows
+    .map((s) => Number(s.confidence))
+    .filter((v) => Number.isFinite(v));
+
+  const riskBuckets = { HIGH: 0, MEDIUM: 0, LOW: 0, NA: 0 };
+  let totalViolations = 0;
+  const breachCounts = new Map();
+
+  for (const row of submissionRows) {
+    const bucket = String(row.risk_category || "NA").toUpperCase();
+    if (!riskBuckets[bucket]) riskBuckets[bucket] = 0;
+    riskBuckets[bucket] += 1;
+    totalViolations += Number(row.violations || 0);
+  }
+
+  for (const session of sessions) {
+    const violations = session.result_json?.compliance?.violations || [];
+    for (const v of violations) {
+      const key = v?.rule_id || "UNKNOWN";
+      breachCounts.set(key, (breachCounts.get(key) || 0) + 1);
+    }
+  }
+
+  const top_rule_breaches = [...breachCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([rule_id, count]) => ({ rule_id, count }));
+
+  const avgScore = scoreValues.length
+    ? scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length
+    : 0;
+  const avgConfidence = confidenceValues.length
+    ? confidenceValues.reduce((a, b) => a + b, 0) / confidenceValues.length
+    : 0;
+
+  const readinessRaw = Math.max(
+    0,
+    Math.min(100, 100 - (totalViolations * 1.75 + riskBuckets.HIGH * 9 + riskBuckets.MEDIUM * 4))
+  );
+  const readiness = Math.round(readinessRaw);
+  const verdict =
+    readiness >= 75 ? "READY_WITH_STANDARD_REVIEW" :
+    readiness >= 50 ? "CONDITIONAL_READY_REQUIRES_REMEDIATION" :
+    "NOT_READY_REQUIRES_MAJOR_REMEDIATION";
+
+  const headline = verdict === "READY_WITH_STANDARD_REVIEW"
+    ? "Submission posture is stable with manageable residual risk."
+    : verdict === "CONDITIONAL_READY_REQUIRES_REMEDIATION"
+      ? "Submission can proceed after targeted remediation of key breaches."
+      : "Submission is not yet ready and needs major remediation before filing.";
+
+  return {
+    sessions_analyzed: submissionRows.length,
+    average_score: Number(avgScore.toFixed(4)),
+    average_score_pct: Number((avgScore * 100).toFixed(1)),
+    average_confidence: Number(avgConfidence.toFixed(4)),
+    average_confidence_pct: Number((avgConfidence * 100).toFixed(1)),
+    total_violations: totalViolations,
+    risk_mix: riskBuckets,
+    top_rule_breaches,
+    readiness_index: readiness,
+    verdict,
+    headline,
+    easy_read_points: [
+      `${riskBuckets.HIGH} high-risk document(s), ${riskBuckets.MEDIUM} medium-risk document(s), ${riskBuckets.LOW} low-risk document(s).`,
+      `${totalViolations} total compliance violation(s) found across selected sessions.`,
+      `Average model confidence is ${Number((avgConfidence * 100).toFixed(1))}%.`,
+      `Readiness index is ${readiness}/100 (${verdict}).`
+    ]
+  };
+}
+
 async function ensureSessionReportForUser(session, userId) {
   const resultJson = session.result_json || {};
   const documentRef = resultJson.document_id;
@@ -578,6 +654,7 @@ router.post("/submission-simulations", requireAuth, async (req, res, next) => {
     const sessions = sessionsResult.rows;
     const reports = [];
     const submissionRows = [];
+    const usableSessions = [];
     const skipped = [];
     for (const session of sessions) {
       try {
@@ -593,12 +670,15 @@ router.post("/submission-simulations", requireAuth, async (req, res, next) => {
 
         const ensured = await ensureSessionReportForUser(session, req.user.id);
         reports.push(ensured);
+        usableSessions.push(session);
         submissionRows.push({
           session_id: session.id,
           file_name: session.file_name,
           document_ref: r.document_id || ensured.document_ref,
           risk_category: r.decision?.risk_category || "NA",
           score: r.decision?.score ?? "NA",
+          confidence: r.decision?.confidence ?? "NA",
+          fraud_score: r.decision?.fraud_score ?? "NA",
           violations: r.compliance?.summary?.violations_count ?? 0
         });
       } catch (sessionError) {
@@ -613,12 +693,15 @@ router.post("/submission-simulations", requireAuth, async (req, res, next) => {
       });
     }
 
+    const analysisSummary = summarizeSimulation(submissionRows, usableSessions);
+
     let finalReport = reports[0];
     if (payload.mode === "combined" || reports.length > 1) {
       const combined = await generateCombinedReport({
         package_name: payload.name,
         regulator: payload.regulator,
-        submissions: submissionRows
+        submissions: submissionRows,
+        analysis_summary: analysisSummary
       });
       const combinedInsert = await pgPool.query(
         `INSERT INTO reports_metadata (user_id, document_ref, report_path, report_type)
@@ -633,15 +716,15 @@ router.post("/submission-simulations", requireAuth, async (req, res, next) => {
       {
         step: "STAGED",
         status: "completed",
-        message: `Simulation staged for ${payload.regulator}.`,
+        message: `Simulation staged for ${payload.regulator}. Readiness index: ${analysisSummary.readiness_index}/100.`,
         timestamp: new Date().toISOString()
       }
     ];
 
     const sim = await pgPool.query(
       `INSERT INTO regulatory_submission_simulations
-       (id, user_id, name, regulator, mode, status, session_ids_json, report_ids_json, report_id, timeline_json)
-       VALUES ($1, $2, $3, $4, $5, 'STAGED', $6::jsonb, $7::jsonb, $8, $9::jsonb)
+       (id, user_id, name, regulator, mode, status, session_ids_json, report_ids_json, report_id, analysis_json, timeline_json)
+       VALUES ($1, $2, $3, $4, $5, 'STAGED', $6::jsonb, $7::jsonb, $8, $9::jsonb, $10::jsonb)
        RETURNING *`,
       [
         randomUUID(),
@@ -652,6 +735,7 @@ router.post("/submission-simulations", requireAuth, async (req, res, next) => {
         JSON.stringify(sessions.map((s) => s.id)),
         JSON.stringify(reports.map((r) => r.id)),
         finalReport.id,
+        JSON.stringify(analysisSummary),
         JSON.stringify(timeline)
       ]
     );
@@ -696,7 +780,7 @@ router.post("/submission-simulations/:id/run", requireAuth, async (req, res, nex
 router.get("/submission-simulations", requireAuth, async (req, res, next) => {
   try {
     const result = await pgPool.query(
-      `SELECT s.*, s.report_id, r.report_path
+      `SELECT s.*, s.report_id, s.analysis_json, r.report_path
        FROM regulatory_submission_simulations s
        LEFT JOIN reports_metadata r ON r.id = s.report_id
        WHERE s.user_id = $1
