@@ -16,6 +16,29 @@ export async function orchestrateAgents(payload) {
   return data;
 }
 
+export async function orchestrateAgentsUpload(payload) {
+  const form = new FormData();
+  const blob = new Blob([payload.fileBuffer], { type: "application/octet-stream" });
+  form.append("file", blob, payload.file_name || "document.bin");
+  form.append("file_name", payload.file_name || "document.bin");
+  form.append("file_path", payload.file_path || "");
+  form.append("rules", JSON.stringify(payload.rules || []));
+  form.append("knowledge_base", JSON.stringify(payload.knowledge_base || []));
+  form.append("agent_prompts", JSON.stringify(payload.agent_prompts || []));
+
+  const response = await fetch(`${env.pythonServiceUrl}/orchestrate-agents-upload`, {
+    method: "POST",
+    body: form
+  });
+
+  const contentType = response.headers.get("content-type") || "";
+  const body = contentType.includes("application/json") ? await response.json() : await response.text();
+  if (!response.ok) {
+    throw new Error(typeof body === "string" ? body : JSON.stringify(body));
+  }
+  return body;
+}
+
 export async function validateCompliance(payload) {
   const { data } = await client.post("/validate-compliance", payload);
   return data;

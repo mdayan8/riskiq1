@@ -1,7 +1,8 @@
 import base64
 import os
 import tempfile
-from fastapi import APIRouter, HTTPException
+import json
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from app.models.schemas import AnalyzeRequest, ComplianceRequest, DecisionRequest, ReportRequest, OrchestrateRequest, CombinedReportRequest, SessionCopilotRequest, ClauseRewriteRequest
 from app.services.extract_service import extract_document_text, normalize_output
 from app.services.deepseek_service import extract_structured_data, session_copilot, rewrite_clause
@@ -81,6 +82,46 @@ def orchestrate(payload: OrchestrateRequest):
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"orchestrate_failed: {str(exc)}")
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
+
+
+@router.post("/orchestrate-agents-upload")
+async def orchestrate_upload(
+    file: UploadFile = File(...),
+    file_name: str = Form(""),
+    file_path: str = Form(""),
+    rules: str = Form("[]"),
+    knowledge_base: str = Form("[]"),
+    agent_prompts: str = Form("[]"),
+):
+    temp_path = None
+    try:
+        parsed_rules = json.loads(rules or "[]")
+        parsed_kb = json.loads(knowledge_base or "[]")
+        parsed_prompts = json.loads(agent_prompts or "[]")
+
+        suffix = os.path.splitext(file.filename or file_name or "document.pdf")[1] or ".pdf"
+        fd, temp_path = tempfile.mkstemp(prefix="riskiq-upload-", suffix=suffix)
+        os.close(fd)
+
+        content = await file.read()
+        with open(temp_path, "wb") as f:
+            f.write(content)
+
+        return orchestrate_agents(
+            file_path=temp_path,
+            file_name=file_name or file.filename or os.path.basename(file_path or temp_path),
+            rules=parsed_rules,
+            knowledge_base=parsed_kb,
+            agent_prompts=parsed_prompts,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"orchestrate_upload_failed: {str(exc)}")
     finally:
         if temp_path and os.path.exists(temp_path):
             try:

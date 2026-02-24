@@ -3,7 +3,7 @@ import path from "path";
 import crypto from "crypto";
 import { pgPool } from "../db/postgres.js";
 import { getMongoDb } from "../db/mongo.js";
-import { generateReport, orchestrateAgents } from "./aiService.js";
+import { generateReport, orchestrateAgentsUpload } from "./aiService.js";
 
 export async function runWorkflow({ filePath, originalName, userId }) {
   return runWorkflowWithHooks({ filePath, originalName, userId });
@@ -35,10 +35,10 @@ export async function runWorkflowWithHooks({ filePath, originalName, userId, onS
   ]);
 
   await onStage({ stage: "DOCUMENT_AGENT", status: "running", message: "Extracting structured data via DeepSeek." });
-  const run = await orchestrateAgents({
+  const run = await orchestrateAgentsUpload({
     file_path: filePath,
     file_name: originalName,
-    file_b64: fileBuffer.toString("base64"),
+    fileBuffer,
     rules: rulesResult.rows.map((row) => ({
       id: row.external_rule_id,
       regulator: row.regulator,
