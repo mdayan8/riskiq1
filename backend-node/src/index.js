@@ -44,7 +44,7 @@ async function boot() {
   await syncReferenceData();
   await connectMongo();
 
-  app.listen(env.port, () => {
+  app.listen(env.port, "0.0.0.0", () => {
     console.log(`Node API listening on port ${env.port}`);
   });
 }
