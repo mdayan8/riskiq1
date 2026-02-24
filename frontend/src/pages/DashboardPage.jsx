@@ -173,7 +173,55 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Full-Width Analytics Section */}
+
+      {/* Agent Swarm Intelligence Section */}
+      <div className="space-y-8">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-1.5 h-6 bg-slate-900 rounded-full" />
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Agent Swarm Intelligence</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Active Inference Swarm</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+          {[
+            { name: "Nexus Core", role: "Orchestration", desc: "System state & task routing engine.", color: "bg-slate-900" },
+            { name: "Omni-Extract", role: "Neural Parser", desc: "Deep document structure extraction.", color: "bg-blue-600" },
+            { name: "Astra-Compliance", role: "Regulatory L2", desc: "GVR & RBI semantic alignment.", color: "bg-emerald-600" },
+            { name: "Sentinel-Risk", role: "Risk Scorer", desc: "Inference-based fraud detection.", color: "bg-rose-600" },
+            { name: "Lexis-Report", role: "Serialization", desc: "High-fidelity PDF generation.", color: "bg-amber-600" },
+            { name: "Atlas-Vault", role: "Persistence", desc: "Multi-layer data persistence.", color: "bg-indigo-600" }
+          ].map((agent, i) => (
+            <div key={i} className="card p-5 group hover:border-slate-300 transition-all flex flex-col justify-between min-h-[160px]">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className={cn("w-2 h-2 rounded-full", agent.color)} />
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">{agent.role}</span>
+                </div>
+                <h4 className="text-sm font-black text-slate-900 tracking-tight mb-1">{agent.name}</h4>
+                <p className="text-[11px] text-slate-500 leading-relaxed font-bold line-clamp-2">
+                  {agent.desc}
+                </p>
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between">
+                <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Online</span>
+                <div className="flex gap-0.5">
+                  <div className="w-1 h-3 bg-emerald-100 rounded-sm" />
+                  <div className="w-1 h-3 bg-emerald-200 rounded-sm" />
+                  <div className="w-1 h-3 bg-emerald-500 rounded-sm" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
       <div className="space-y-8">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Decision Engineering</h2>
@@ -306,6 +354,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 }

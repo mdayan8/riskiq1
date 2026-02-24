@@ -5,9 +5,9 @@ import { api } from "../lib/api";
 export default function LoginPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState("login");
-  const [name, setName] = useState("Admin User");
-  const [email, setEmail] = useState("admin@riskiq.local");
-  const [password, setPassword] = useState("password");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -51,10 +51,6 @@ export default function LoginPage() {
           {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
         </button>
       </form>
-
-      <div className="mt-4 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
-        Demo account: <strong>admin@riskiq.local</strong> / <strong>password</strong>
-      </div>
     </div>
   );
 }

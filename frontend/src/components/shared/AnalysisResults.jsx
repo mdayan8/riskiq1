@@ -69,19 +69,34 @@ export default function AnalysisResults({ result, sessionId = "" }) {
     return map;
   }, [riskyViolations, rewriteResults]);
 
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState("");
+
   const downloadReport = async () => {
     const documentRef = result.document_id;
     if (!documentRef) return;
 
+    setDownloading(true);
+    setDownloadError("");
     try {
       let reportId = result.report_id;
       if (!reportId) {
         const latest = await api.get(`/reports/by-document/${documentRef}/latest`);
         reportId = latest.data?.report?.id;
       }
-      if (!reportId) return;
+      if (!reportId) {
+        setDownloadError("No report available for this document yet.");
+        return;
+      }
 
       const response = await api.get(`/reports/${reportId}/download`, { responseType: "blob" });
+
+      // Validation: Check if it's actually a PDF
+      if (response.data.type !== "application/pdf") {
+        setDownloadError("The server returned an invalid file format. Please try again later.");
+        return;
+      }
+
       const blob = new Blob([response.data], { type: "application/pdf" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -92,7 +107,9 @@ export default function AnalysisResults({ result, sessionId = "" }) {
       a.remove();
       window.URL.revokeObjectURL(url);
     } catch (_e) {
-      // no-op
+      setDownloadError("Download failed. The report might still be generating.");
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -442,13 +459,24 @@ export default function AnalysisResults({ result, sessionId = "" }) {
               <p className="text-xs text-gray-400 max-w-lg">All decisions are cross-mapped against active regulatory schemas.</p>
             </div>
             {result.document_id && (
-              <button
-                type="button"
-                onClick={downloadReport}
-                className="bg-accent hover:bg-accent-dark transition-colors px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg"
-              >
-                <FileText className="w-4 h-4" /> Intelligence Report
-              </button>
+              <div className="flex flex-col items-end gap-2">
+                <button
+                  type="button"
+                  onClick={downloadReport}
+                  disabled={downloading}
+                  className="bg-accent hover:bg-accent-dark transition-colors px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg disabled:opacity-50"
+                >
+                  {downloading ? (
+                    <span className="w-4 h-4 border-2 border-white border-r-transparent rounded-full animate-spin mr-1" />
+                  ) : (
+                    <FileText className="w-4 h-4" />
+                  )}
+                  Intelligence Report
+                </button>
+                {downloadError && (
+                  <p className="text-[10px] text-red-400 font-medium animate-pulse">{downloadError}</p>
+                )}
+              </div>
             )}
           </div>
           <div className="mt-6 flex flex-wrap gap-2 relative z-10">

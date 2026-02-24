@@ -18,7 +18,15 @@ export default function ReportsPage() {
   const downloadReport = async (report) => {
     try {
       setDownloadingId(report.id);
+      setError(""); // Reset error
       const response = await api.get(`/reports/${report.id}/download`, { responseType: "blob" });
+
+      // Validation: Check if it's actually a PDF
+      if (response.data.type !== "application/pdf") {
+        setError("Invalid report format received. The file may be corrupt.");
+        return;
+      }
+
       const blob = new Blob([response.data], { type: "application/pdf" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");

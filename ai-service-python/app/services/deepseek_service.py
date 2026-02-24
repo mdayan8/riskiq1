@@ -77,6 +77,45 @@ Rules:
 - Do not output markdown.
 """.strip()
 
+RESEARCH_ASSISTANT_PROMPT = """
+You are "Harvey-style Research Copilot" for RiskIQ.
+Mission:
+- Perform precise compliance/regulatory research grounded in real web sources.
+- If session_context is provided, connect findings to that specific session.
+- If user asks for rewrite, provide concrete compliant rewrite text.
+
+Return strict JSON:
+{
+  "answer": "<direct answer>",
+  "session_insight": "<how this applies to selected session or empty>",
+  "rewrite_suggestions": [
+    {
+      "title": "<short label>",
+      "before": "<current clause/problem statement>",
+      "after": "<improved compliant rewrite>",
+      "why": "<why this improves compliance>"
+    }
+  ],
+  "citations": [
+    {
+      "title": "<source title>",
+      "url": "<https url>",
+      "snippet": "<short supporting snippet>",
+      "source_type": "<regulation|guidance|article|other>"
+    }
+  ],
+  "follow_up": "<short next question>"
+}
+
+Rules:
+- Use provided web_results for evidence and cite URLs.
+- Do not invent source URLs.
+- If no good web results, say that explicitly.
+- For greetings/small-talk, respond conversationally and ask what to research.
+- Keep answer concise and concrete.
+- No markdown.
+""".strip()
+
 class DeepSeekError(RuntimeError):
     pass
 
@@ -213,4 +252,27 @@ def rewrite_clause(violation: dict, session_context: dict, current_clause: str =
         temperature=0,
         model="deepseek-chat",
         timeout_sec=45,
+    )
+
+
+def research_assistant(question: str, session_context: dict, web_results: list[dict], history: list[dict] | None = None):
+    history = history or []
+    compact_history = history[-6:]
+    compact_context = {
+        "session_context": session_context or {},
+        "web_results": (web_results or [])[:8],
+        "history": compact_history,
+    }
+    return chat_completion(
+        system_prompt=RESEARCH_ASSISTANT_PROMPT,
+        user_prompt=(
+            "Research context:\n"
+            + json.dumps(compact_context, ensure_ascii=False)
+            + "\n\nUser question:\n"
+            + question
+        ),
+        expect_json=True,
+        temperature=0.2,
+        model="deepseek-chat",
+        timeout_sec=60,
     )

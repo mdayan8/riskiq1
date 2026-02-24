@@ -150,8 +150,29 @@ export default function SessionsPage() {
   const downloadReport = async () => {
     if (!selected) return;
     setDownloading(true);
+    setError(""); // Reset error
     try {
-      const response = await api.get(`/reports/${selected.result_json?.report_id}/download`, { responseType: "blob" });
+      let reportId = selected.result_json?.report_id;
+
+      // Fallback: If report_id is missing or stale, try to find by document_id
+      if (!reportId && selected.result_json?.document_id) {
+        const latest = await api.get(`/reports/by-document/${selected.result_json.document_id}/latest`);
+        reportId = latest.data?.report?.id;
+      }
+
+      if (!reportId) {
+        setError("No report available for this session yet.");
+        return;
+      }
+
+      const response = await api.get(`/reports/${reportId}/download`, { responseType: "blob" });
+
+      // Validation: Check if it's actually a PDF
+      if (response.data.type !== "application/pdf") {
+        setError("Invalid report format received. The report may be corrupted or outdated.");
+        return;
+      }
+
       const blob = new Blob([response.data], { type: "application/pdf" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -160,9 +181,10 @@ export default function SessionsPage() {
       document.body.appendChild(a);
       a.click();
       a.remove();
-    } catch {
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
       setError("Report download failed. Generating on-demand...");
-      // Logic for re-gen omitted for brevity but should follow previous pattern
+      // Logic for re-gen should follow if needed
     } finally {
       setDownloading(false);
     }

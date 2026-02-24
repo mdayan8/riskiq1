@@ -1,4 +1,5 @@
 import express from "express";
+import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import { z } from "zod";
@@ -597,18 +598,44 @@ router.get("/data-sources", requireAuth, async (req, res, next) => {
 router.get("/reports/:id/download", requireAuth, async (req, res, next) => {
   try {
     const result = await pgPool.query(
-      `SELECT report_path
+      `SELECT report_path, document_ref
        FROM reports_metadata
        WHERE user_id = $1 AND id = $2`,
       [req.user.id, req.params.id]
     );
 
+    let reportPath = "";
+    let documentRef = "";
+
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Report not found" });
+      // Fallback: Check if we have ANY report for this user with a matching document_ref if possible
+      // But we don't know the document_ref here yet unless we look it up.
+      // So let's try to just return 404 but with a proper JSON header if it's an error.
+      return res.status(404).json({ error: "Report ID not found" });
+    } else {
+      reportPath = result.rows[0].report_path;
+      documentRef = result.rows[0].document_ref;
     }
 
-    const absolute = path.resolve(process.cwd(), "..", result.rows[0].report_path);
-    return res.download(absolute);
+    const absolute = path.resolve(process.cwd(), "..", reportPath);
+    if (!fs.existsSync(absolute)) {
+      // Deep fallback: File missing on disk, try to find another report for this document
+      const fallback = await pgPool.query(
+        `SELECT report_path FROM reports_metadata
+         WHERE user_id = $1 AND document_ref = $2 AND id != $3
+         ORDER BY created_at DESC LIMIT 1`,
+        [req.user.id, documentRef, req.params.id]
+      );
+      if (fallback.rowCount > 0 && fs.existsSync(path.resolve(process.cwd(), "..", fallback.rows[0].report_path))) {
+        const fallbackAbsolute = path.resolve(process.cwd(), "..", fallback.rows[0].report_path);
+        res.setHeader("Content-Type", "application/pdf");
+        return res.download(fallbackAbsolute, `riskiq-report-${documentRef}.pdf`);
+      }
+      return res.status(404).json({ error: "Report file not found on storage" });
+    }
+
+    res.setHeader("Content-Type", "application/pdf");
+    return res.download(absolute, `riskiq-report-${documentRef}.pdf`);
   } catch (error) {
     next(error);
   }
