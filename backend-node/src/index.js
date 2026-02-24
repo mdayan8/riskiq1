@@ -5,7 +5,7 @@ import path from "path";
 import { env } from "./config/env.js";
 import { connectMongo } from "./db/mongo.js";
 import { ensurePgConnection } from "./db/postgres.js";
-import { ensurePlatformSchema, syncReferenceData } from "./db/bootstrap.js";
+import { ensureFixedAdminUser, ensurePlatformSchema, syncReferenceData } from "./db/bootstrap.js";
 import authRoutes from "./routes/auth.js";
 import coreRoutes from "./routes/core.js";
 
@@ -31,6 +31,7 @@ app.use((err, _req, res, _next) => {
 async function boot() {
   await ensurePgConnection();
   await ensurePlatformSchema();
+  await ensureFixedAdminUser();
   await syncReferenceData();
   await connectMongo();
 

@@ -9,7 +9,9 @@ const required = [
   "POSTGRES_URL",
   "MONGO_URL",
   "MONGO_DB",
-  "UPLOAD_DIR"
+  "UPLOAD_DIR",
+  "ADMIN_EMAIL",
+  "ADMIN_PASSWORD"
 ];
 
 for (const key of required) {
@@ -26,5 +28,9 @@ export const env = {
   postgresUrl: process.env.POSTGRES_URL,
   mongoUrl: process.env.MONGO_URL,
   mongoDb: process.env.MONGO_DB,
-  uploadDir: process.env.UPLOAD_DIR
+  uploadDir: process.env.UPLOAD_DIR,
+  adminEmail: process.env.ADMIN_EMAIL.toLowerCase(),
+  adminPassword: process.env.ADMIN_PASSWORD,
+  adminName: process.env.ADMIN_NAME || "RiskIQ Admin",
+  disablePublicRegistration: String(process.env.DISABLE_PUBLIC_REGISTRATION || "true").toLowerCase() === "true"
 };

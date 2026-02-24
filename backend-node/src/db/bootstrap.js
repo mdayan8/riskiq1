@@ -1,6 +1,8 @@
 import fs from "fs";
 import path from "path";
+import bcrypt from "bcryptjs";
 import { pgPool } from "./postgres.js";
+import { env } from "../config/env.js";
 
 function loadJson(relativePath) {
   const fullPath = path.resolve(process.cwd(), "..", relativePath);
@@ -163,6 +165,40 @@ export async function syncReferenceData() {
         JSON.stringify(prompt.input_contract),
         JSON.stringify(prompt.output_contract)
       ]
+    );
+  }
+}
+
+export async function ensureFixedAdminUser() {
+  const email = env.adminEmail;
+  const password = env.adminPassword;
+  const name = env.adminName;
+  const role = "Admin";
+
+  const existing = await pgPool.query(
+    "SELECT id, password_hash FROM users WHERE email = $1 LIMIT 1",
+    [email]
+  );
+
+  if (existing.rowCount === 0) {
+    const hash = await bcrypt.hash(password, 12);
+    await pgPool.query(
+      `INSERT INTO users (name, email, password_hash, role)
+       VALUES ($1, $2, $3, $4)`,
+      [name, email, hash, role]
+    );
+    return;
+  }
+
+  const current = existing.rows[0];
+  const samePassword = await bcrypt.compare(password, current.password_hash);
+  if (!samePassword) {
+    const hash = await bcrypt.hash(password, 12);
+    await pgPool.query(
+      `UPDATE users
+       SET password_hash = $2, name = $3, role = $4
+       WHERE id = $1`,
+      [current.id, hash, name, role]
     );
   }
 }

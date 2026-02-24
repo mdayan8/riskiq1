@@ -21,6 +21,10 @@ const loginSchema = z.object({
 
 router.post("/register", async (req, res, next) => {
   try {
+    if (env.disablePublicRegistration) {
+      return res.status(403).json({ error: "Public registration is disabled" });
+    }
+
     const payload = registerSchema.parse(req.body);
     const hash = await bcrypt.hash(payload.password, 10);
 
