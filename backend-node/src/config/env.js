@@ -32,5 +32,13 @@ export const env = {
   adminEmail: process.env.ADMIN_EMAIL.toLowerCase(),
   adminPassword: process.env.ADMIN_PASSWORD,
   adminName: process.env.ADMIN_NAME || "RiskIQ Admin",
-  disablePublicRegistration: String(process.env.DISABLE_PUBLIC_REGISTRATION || "true").toLowerCase() === "true"
+  disablePublicRegistration: String(process.env.DISABLE_PUBLIC_REGISTRATION || "true").toLowerCase() === "true",
+  corsOrigins: (process.env.CORS_ORIGINS || "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean)
 };
+
+if (env.adminPassword.length < 12) {
+  throw new Error("ADMIN_PASSWORD must be at least 12 characters");
+}

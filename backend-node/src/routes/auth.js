@@ -49,9 +49,14 @@ router.post("/register", async (req, res, next) => {
 router.post("/login", async (req, res, next) => {
   try {
     const payload = loginSchema.parse(req.body);
-    const result = await pgPool.query("SELECT id, email, password_hash, role, name FROM users WHERE email = $1", [
-      payload.email
-    ]);
+    if (String(payload.email || "").toLowerCase() !== env.adminEmail) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const result = await pgPool.query(
+      "SELECT id, email, password_hash, role, name FROM users WHERE email = $1 LIMIT 1",
+      [env.adminEmail]
+    );
 
     if (result.rowCount === 0) {
       return res.status(401).json({ error: "Invalid credentials" });
@@ -63,7 +68,11 @@ router.post("/login", async (req, res, next) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const token = jwt.sign({ id: user.id, role: user.role, email: user.email }, env.jwtSecret, {
+    if (user.role !== "Admin") {
+      return res.status(403).json({ error: "Account is not authorized" });
+    }
+
+    const token = jwt.sign({ id: user.id, role: "Admin", email: user.email }, env.jwtSecret, {
       expiresIn: env.jwtExpiresIn
     });
 

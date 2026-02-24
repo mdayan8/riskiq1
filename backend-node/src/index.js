@@ -10,7 +10,16 @@ import authRoutes from "./routes/auth.js";
 import coreRoutes from "./routes/core.js";
 
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
+      if (env.corsOrigins.length === 0) return callback(null, true);
+      if (env.corsOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error("Origin not allowed by CORS"));
+    }
+  })
+);
 app.use(express.json({ limit: "5mb" }));
 
 const uploadDir = path.resolve(process.cwd(), env.uploadDir);
@@ -25,7 +34,7 @@ app.use((err, _req, res, _next) => {
   }
 
   console.error(err);
-  return res.status(500).json({ error: "Internal server error", detail: err.message });
+  return res.status(500).json({ error: "Internal server error" });
 });
 
 async function boot() {
