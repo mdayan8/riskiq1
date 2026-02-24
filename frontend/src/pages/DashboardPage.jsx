@@ -85,6 +85,9 @@ export default function DashboardPage() {
   );
 
   const alertTotal = data.alerts_by_severity.reduce((acc, item) => acc + Number(item.total), 0);
+  const passTotal = Number(data.compliance_distribution.find((i) => i.status === "PASS")?.total || 0);
+  const complianceTotal = data.compliance_distribution.reduce((acc, item) => acc + Number(item.total || 0), 0);
+  const compliantFootprintPct = complianceTotal > 0 ? Math.round((passTotal / complianceTotal) * 100) : 0;
 
   // Mock sparklines based on trend data
   const docSpark = data.score_trend.slice(-10).map((v, i) => ({ v: v.avg_score + Math.random() * 0.1 }));
@@ -157,7 +160,7 @@ export default function DashboardPage() {
           <div className="flex justify-between items-start relative z-10">
             <div>
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">Compliant Footprint</p>
-              <h3 className="text-5xl font-black text-emerald-600 tracking-tighter">{Math.round((data.compliance_distribution.find(i => i.status === 'PASS')?.total / (alertTotal || 1)) * 100)}%</h3>
+              <h3 className="text-5xl font-black text-emerald-600 tracking-tighter">{compliantFootprintPct}%</h3>
             </div>
             <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-100">
               <ShieldAlert className="w-8 h-8 text-emerald-600" />

@@ -38,6 +38,7 @@ export async function runWorkflowWithHooks({ filePath, originalName, userId, onS
   const run = await orchestrateAgents({
     file_path: filePath,
     file_name: originalName,
+    file_b64: fileBuffer.toString("base64"),
     rules: rulesResult.rows.map((row) => ({
       id: row.external_rule_id,
       regulator: row.regulator,

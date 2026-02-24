@@ -1,4 +1,7 @@
-from fastapi import APIRouter
+import base64
+import os
+import tempfile
+from fastapi import APIRouter, HTTPException
 from app.models.schemas import AnalyzeRequest, ComplianceRequest, DecisionRequest, ReportRequest, OrchestrateRequest, CombinedReportRequest, SessionCopilotRequest, ClauseRewriteRequest
 from app.services.extract_service import extract_document_text, normalize_output
 from app.services.deepseek_service import extract_structured_data, session_copilot, rewrite_clause
@@ -58,13 +61,32 @@ def report(payload: ReportRequest):
 
 @router.post("/orchestrate-agents")
 def orchestrate(payload: OrchestrateRequest):
-    return orchestrate_agents(
-        file_path=payload.file_path,
-        file_name=payload.file_name,
-        rules=payload.rules,
-        knowledge_base=payload.knowledge_base,
-        agent_prompts=payload.agent_prompts,
-    )
+    temp_path = None
+    try:
+        file_path = payload.file_path
+        if payload.file_b64:
+            suffix = os.path.splitext(payload.file_name or "document.pdf")[1] or ".pdf"
+            fd, temp_path = tempfile.mkstemp(prefix="riskiq-", suffix=suffix)
+            os.close(fd)
+            with open(temp_path, "wb") as f:
+                f.write(base64.b64decode(payload.file_b64))
+            file_path = temp_path
+
+        return orchestrate_agents(
+            file_path=file_path,
+            file_name=payload.file_name,
+            rules=payload.rules,
+            knowledge_base=payload.knowledge_base,
+            agent_prompts=payload.agent_prompts,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"orchestrate_failed: {str(exc)}")
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
 
 
 @router.post("/generate-combined-report")

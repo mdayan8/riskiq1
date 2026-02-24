@@ -38,6 +38,7 @@ class ReportRequest(BaseModel):
 class OrchestrateRequest(BaseModel):
     file_path: str
     file_name: str
+    file_b64: str = ""
     rules: List[Dict[str, Any]] = Field(default_factory=list)
     knowledge_base: List[Dict[str, Any]] = Field(default_factory=list)
     agent_prompts: List[Dict[str, Any]] = Field(default_factory=list)
